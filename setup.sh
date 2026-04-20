@@ -3,29 +3,27 @@ set -e
 
 echo "--- 1. Installing Debian System Dependencies ---"
 sudo apt update
+# RESTORED: Your original libwlroots-0.18-dev
 sudo apt install -y build-essential gcc g++ libwayland-dev libwayland-bin \
-    wayland-protocols pkg-config libwlroots-dev libxkbcommon-dev \
-    libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git scdoc
+    wayland-protocols pkg-config libwlroots-0.18-dev libxkbcommon-dev \
+    libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git
 
-# --- 2. Getting Zig (0.16.0 required for current River) ---
-ZIG_VER="0.16.0"
-ZIG_FOLDER="zig-x86_64-linux-$ZIG_VER"
-
+# --- 2. Getting Zig (0.16.0) ---
+# Fixed naming convention for the 2026 download server
 if [ ! -f "/usr/local/bin/river" ]; then
-    if [ ! -d "$ZIG_FOLDER" ]; then
-        echo "--- Downloading Zig Toolchain ($ZIG_VER) ---"
-        wget "https://ziglang.org/download/$ZIG_VER/$ZIG_FOLDER.tar.xz"
-        tar -xf "$ZIG_FOLDER.tar.xz"
+    if [ ! -d "zig-x86_64-linux-0.16.0" ]; then
+        echo "--- Downloading Zig Toolchain (0.16.0) ---"
+        wget https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz
+        tar -xf zig-x86_64-linux-0.16.0.tar.xz
     fi
-    # Add current folder's zig to path for this session
-    export PATH="$PATH:$(pwd)/$ZIG_FOLDER"
+    export PATH=$PATH:$(pwd)/zig-x86_64-linux-0.16.0
 
-    # --- 3. Building River (The Host Compositor) ---
+    # --- 3. Building River ---
     if [ ! -d "river" ]; then
         echo "--- Cloning and Building River ---"
         git clone https://github.com/riverwm/river
         cd river
-        zig build -Doptimize=ReleaseSafe -Dxwayland=true
+        zig build -Doptimize=ReleaseSafe
         sudo cp zig-out/bin/river /usr/local/bin/
         cd ..
     fi
@@ -35,20 +33,13 @@ fi
 echo "--- Preparing Rinux-WM ---"
 mkdir -p protocol src include
 
-# Fetch the specific protocol file your code needs
-# We use the GitHub mirror for stability
 wget https://raw.githubusercontent.com/riverwm/river/master/protocol/river-window-management-v1.xml \
      -O protocol/river-window-management-v1.xml
 
-# Make sure your existing build.sh is executable and run it
 if [ -f build.sh ]; then
     chmod +x build.sh
-    echo "--- Running Rinux-WM Build ---"
+    echo "--- Running Build ---"
     ./build.sh
-else
-    echo "--- Notice: build.sh not found, skipping Rinux-WM compilation ---"
 fi
 
 echo "--- SUCCESS ---"
-echo "To test: Type 'river' to start the compositor,"
-echo "then run './rinux-wm' from a terminal (like foot) inside River."
