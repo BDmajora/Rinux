@@ -1,31 +1,46 @@
 #!/bin/bash
-# setup.sh - The "Lazy Dev" Bootstrap for Rinux
-
-# Exit on error
 set -e
 
-echo "--- Initializing Rinux Environment ---"
-
-# 1. Update and install core dependencies
+echo "--- 1. Installing Debian System Dependencies ---"
 sudo apt update
 sudo apt install -y build-essential libwayland-dev libwayland-bin \
-                    wayland-protocols pkg-config river wget git
+    wayland-protocols pkg-config libwlroots-dev libxkbcommon-dev \
+    libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git
 
-# 2. Setup directory structure
-mkdir -p protocol include src
+# --- 2. Getting Zig (Required to build River) ---
+# We download the binary directly because it's not in the Debian repos.
+if [ ! -d "zig-linux-x86_64-0.11.0" ]; then
+    echo "--- Downloading Zig Toolchain ---"
+    wget https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz
+    tar -xf zig-linux-x86_64-0.11.0.tar.xz
+fi
+export PATH=$PATH:$(pwd)/zig-linux-x86_64-0.11.0
 
-# 3. Fetch the required River protocol XML
-if [ ! -f protocol/river-window-management-v1.xml ]; then
-    echo "Downloading River protocol..."
-    wget https://codeberg.org/river/river/raw/branch/master/protocol/river-window-management-v1.xml \
-         -O protocol/river-window-management-v1.xml
+# --- 3. Building River (The Host Compositor) ---
+if [ ! -d "river" ]; then
+    echo "--- Cloning and Building River ---"
+    git clone https://codeberg.org/river/river
+    cd river
+    zig build -Doptimize=ReleaseSafe
+    sudo cp zig-out/bin/river /usr/local/bin/
+    cd ..
 fi
 
-# 4. Ensure build.sh is executable
+# --- 4. Setting up Rinux-WM ---
+echo "--- Preparing Rinux-WM ---"
+mkdir -p protocol src include
+
+# Fetch the specific protocol file your code needs
+wget https://codeberg.org/river/river/raw/branch/master/protocol/river-window-management-v1.xml \
+     -O protocol/river-window-management-v1.xml
+
+# Make sure your existing build.sh is executable
 if [ -f build.sh ]; then
     chmod +x build.sh
-    echo "Setup complete. Running build..."
+    echo "--- Running Build ---"
     ./build.sh
-else
-    echo "Setup complete. (No build.sh found to run automatically)"
 fi
+
+echo "--- SUCCESS ---"
+echo "To test: Type 'river' to start the compositor,"
+echo "then run './rinux-wm' from a terminal inside River."
