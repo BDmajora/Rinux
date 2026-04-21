@@ -1,35 +1,56 @@
 #!/bin/bash
 set -e
 
-# 1. install system dependencies
+# --- 1. Install Build Dependencies ---
+echo "Installing dependencies for Debian 13..."
 sudo apt update
-sudo apt install -y curl git build-essential xdg-utils wget
+sudo apt install -y \
+    git \
+    build-essential \
+    pkg-config \
+    wayland-protocols \
+    libwayland-dev \
+    libwlroots-dev \
+    libinput-dev \
+    libxkbcommon-dev \
+    libpixman-1-dev \
+    libudev-dev \
+    libevdev-dev \
+    wget \
+    zig
 
-# 2. setup nickh repository for river
-# official debian 13 repos lack river; using the unofficial bookworm repo
-sudo wget -O /usr/share/keyrings/nickh-archive-keyring.gpg https://www.ne.jp/asahi/nickh/debian/nickh-archive-keyring.gpg
-sudo wget -O /etc/apt/sources.list.d/nickh.sources https://www.ne.jp/asahi/nickh/debian/nickh.sources
+# --- 2. Build River ---
+if [ ! -d "river" ]; then
+    git clone --recursive https://github.com/riverwm/river
+fi
 
-# 3. sync and install river
-sudo apt update
-sudo apt install -y river
+cd river
+# clean any previous attempts
+rm -rf .zig-cache zig-out
 
-# 4. setup river configuration
+echo "Building River..."
+zig build -Doptimize=ReleaseSafe
+
+echo "Installing binaries..."
+sudo cp zig-out/bin/river /usr/local/bin/
+sudo cp zig-out/bin/riverctl /usr/local/bin/
+cd ..
+
+# --- 3. Configuration ---
 mkdir -p ~/.config/river
 if [ ! -f ~/.config/river/init ]; then
-    zcat /usr/share/doc/river/example/init.gz > ~/.config/river/init
+    # try to grab the example from the source folder we just downloaded
+    cp river/example/init ~/.config/river/init
     chmod +x ~/.config/river/init
 fi
 
-# 5. prepare rinux workspace
-mkdir -p ~/Rinux
-cd ~/Rinux
+# --- 4. Scaffolding (Rinux) ---
+echo "Setting up Rinux Workspace..."
 mkdir -p protocol src include
 
-# fetch window management protocol
 if [ ! -f "protocol/river-window-management-v1.xml" ]; then
     wget -q https://raw.githubusercontent.com/riverwm/river/master/protocol/river-window-management-v1.xml \
          -O protocol/river-window-management-v1.xml
 fi
 
-echo "setup complete: river installed via nickh repo"
+echo "SUCCESS: River built and Rinux workspace ready"
