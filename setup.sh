@@ -1,57 +1,75 @@
 #!/bin/bash
 set -e
 
-echo "--- 1. Installing Debian System Dependencies ---"
+# --- 1. System Prep ---
+echo "--- 1. Updating Debian 13 & Installing Base Tools ---"
 sudo apt update
-sudo apt install -y build-essential gcc g++ libwayland-dev libwayland-bin \
-    wayland-protocols pkg-config libwlroots-0.18-dev libxkbcommon-dev \
-    libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git scdoc
+sudo apt install -y curl git build-essential xdg-utils
 
-# --- 2. Fix the wp_color_manager_v1 version error ---
-echo "--- Injecting updated color-management protocol ---"
-# We download the v2 protocol file directly from the source
-# and place it into the staging directory where River looks for it.
-COLOR_PROTO_DIR="/usr/share/wayland-protocols/staging/color-management"
-sudo mkdir -p "$COLOR_PROTO_DIR"
-sudo wget -q https://gitlab.freedesktop.org/wayland/wayland-protocols/-/raw/main/staging/color-management/color-management-v1.xml \
-     -O "$COLOR_PROTO_DIR/color-management-v1.xml"
-
-# --- 3. Getting Zig (0.16.0) ---
-ZIG_FOLDER="zig-x86_64-linux-0.16.0"
-if [ ! -d "$ZIG_FOLDER" ]; then
-    echo "--- Downloading Zig Toolchain (0.16.0) ---"
-    wget "https://ziglang.org/download/0.16.0/$ZIG_FOLDER.tar.xz"
-    tar -xf "$ZIG_FOLDER.tar.xz"
+# --- 2. Nix Installation (The Dependency Engine) ---
+if ! command -v nix &> /dev/null; then
+    echo "--- 2. Installing Nix ---"
+    curl -L https://nixos.org/nix/install | sh -s -- --daemon
+    # Load Nix into the current shell session
+    if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+        . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+    fi
 fi
 
-export PATH="$PATH:$(pwd)/$ZIG_FOLDER"
+# --- 3. Create the Build Flake ---
+# This ensures Zig 0.13+ and wlroots 0.18+ are always used, regardless of Debian repos.
+echo "--- 3. Generating Build Environment ---"
+cat <<EOF > flake.nix
+{
+  description = "Rinux-WM Build Environment";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  outputs = { self, nixpkgs }:
+    let
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    in {
+      devShells.x86_64-linux.default = pkgs.mkShell {
+        nativeBuildInputs = with pkgs; [
+          zig_0_13
+          pkg-config
+          wayland-scanner
+          scdoc
+        ];
+        buildInputs = with pkgs; [
+          wlroots_0_18
+          wayland
+          wayland-protocols
+          libxkbcommon
+          pixman
+          libinput
+          libcap
+          mesa
+        ];
+      };
+    };
+}
+EOF
 
-# --- 4. Building and Installing River ---
-if [ ! -f "/usr/local/bin/river" ]; then
-    echo "--- Building River ---"
-    if [ ! -d "river" ]; then
-        git clone https://github.com/riverwm/river
+# --- 4. Build River inside the Nix Shell ---
+echo "--- 4. Building River (Compositor Base) ---"
+nix develop --command bash -c "
+    if [ ! -d 'river' ]; then
+        git clone --recursive https://github.com/riverwm/river
     fi
     cd river
-    
-    # Force a clean build to recognize the new protocol file
-    rm -rf .zig-cache zig-out
-    
     zig build -Doptimize=ReleaseSafe
     
-    echo "--- Installing River to /usr/local/bin ---"
+    echo 'Installing River to /usr/local/bin...'
     sudo cp zig-out/bin/river /usr/local/bin/
     sudo cp zig-out/bin/riverctl /usr/local/bin/
-    cd ..
-else
-    echo "--- River is already installed ---"
-fi
+"
 
-# --- 5. Preparing Rinux-WM Environment ---
-echo "--- Preparing Rinux-WM Protocols ---"
+# --- 5. Rinux-WM Prep ---
+echo "--- 5. Preparing Rinux-WM Protocol & Headers ---"
 mkdir -p protocol src include
 
+# We get the protocol directly to your project folder, not /usr/share
 wget -q https://raw.githubusercontent.com/riverwm/river/master/protocol/river-window-management-v1.xml \
      -O protocol/river-window-management-v1.xml
 
-echo "--- SUCCESS ---"
+echo "--- SUCCESS: Environment Ready ---"
+echo "To build your custom WM, use: 'nix develop --command zig build'"
