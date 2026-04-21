@@ -78,4 +78,16 @@ if [ ! -f "protocol/river-window-management-v1.xml" ]; then
          -O protocol/river-window-management-v1.xml
 fi
 
+# --- 6. Automated Init Update ---
+echo "Automating River configuration to launch Rinux-WM..."
+# Check if the line already exists to prevent duplicate entries
+if ! grep -q "rinux-wm" ~/.config/river/init; then
+    echo "" >> ~/.config/river/init
+    echo "# Launch Rinux-WM automatically" >> ~/.config/river/init
+    echo "$HOME/Rinux/rinux-wm &" >> ~/.config/river/init
+    echo "Rinux-WM added to init file."
+else
+    echo "Rinux-WM launch command already present in init file."
+fi
+
 echo "SUCCESS: River built on stable tag ${RIVER_TAG} and workspace ready."
