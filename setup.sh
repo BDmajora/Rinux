@@ -4,6 +4,7 @@ set -e
 # --- 1. Install Build Dependencies ---
 echo "Installing dependencies for Ubuntu 25.10..."
 sudo apt update
+# Removed 'zig' from apt install since the Ubuntu repo version is too old for River
 sudo apt install -y \
     build-essential \
     gcc \
@@ -20,16 +21,37 @@ sudo apt install -y \
     libgbm-dev \
     wget \
     git \
-    scdoc \
-    zig
+    scdoc
 
-# --- 2. Build River ---
+# --- 2. Install Correct Zig Version ---
+ZIG_VERSION="0.13.0"
+echo "Ensuring Zig ${ZIG_VERSION} is installed..."
+
+# Check if Zig is installed and matches the required version
+if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
+    echo "Downloading Zig ${ZIG_VERSION}..."
+    wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
+    tar -xf "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
+    
+    # Move to /opt and create a symlink in /usr/local/bin
+    sudo rm -rf /opt/zig
+    sudo mv "zig-linux-x86_64-${ZIG_VERSION}" /opt/zig
+    sudo ln -sf /opt/zig/zig /usr/local/bin/zig
+    
+    # Clean up the downloaded tarball
+    rm "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
+    echo "Zig ${ZIG_VERSION} installed successfully."
+else
+    echo "Zig $(zig version) is already installed."
+fi
+
+# --- 3. Build River ---
 if [ ! -d "river" ]; then
     git clone --recursive https://github.com/riverwm/river
 fi
 
 cd river
-# Clear previous build artifacts
+# Clear previous failed build artifacts
 rm -rf .zig-cache zig-out
 
 echo "Building River..."
@@ -40,7 +62,7 @@ sudo cp zig-out/bin/river /usr/local/bin/
 sudo cp zig-out/bin/riverctl /usr/local/bin/
 cd ..
 
-# --- 3. Configuration ---
+# --- 4. Configuration ---
 echo "Setting up River configuration..."
 mkdir -p ~/.config/river
 if [ ! -f ~/.config/river/init ]; then
@@ -49,7 +71,7 @@ if [ ! -f ~/.config/river/init ]; then
     chmod +x ~/.config/river/init
 fi
 
-# --- 4. Scaffolding (Rinux) ---
+# --- 5. Scaffolding (Rinux) ---
 echo "Setting up Rinux Workspace..."
 mkdir -p protocol src include
 
