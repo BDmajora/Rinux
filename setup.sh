@@ -22,7 +22,8 @@ sudo apt install -y \
     libgbm-dev \
     wget \
     git \
-    scdoc
+    scdoc \
+    foot
 
 # --- 2. Install Zig 0.13.0 ---
 ZIG_VERSION="0.13.0"
@@ -79,15 +80,29 @@ if [ ! -f "protocol/river-window-management-v1.xml" ]; then
 fi
 
 # --- 6. Automated Init Update ---
-echo "Automating River configuration to launch Rinux-WM..."
-# Check if the line already exists to prevent duplicate entries
-if ! grep -q "rinux-wm" ~/.config/river/init; then
-    echo "" >> ~/.config/river/init
-    echo "# Launch Rinux-WM automatically" >> ~/.config/river/init
-    echo "$HOME/Rinux/rinux-wm &" >> ~/.config/river/init
-    echo "Rinux-WM added to init file."
+echo "Automating River configuration to launch Rinux-WM and Foot..."
+CONFIG_FILE="$HOME/.config/river/init"
+
+# Ensure Rinux-WM is launched
+if ! grep -q "rinux-wm" "$CONFIG_FILE"; then
+    echo "" >> "$CONFIG_FILE"
+    echo "# Launch Rinux-WM automatically" >> "$CONFIG_FILE"
+    echo "$HOME/Rinux/rinux-wm &" >> "$CONFIG_FILE"
+    echo " [+] Config updated: Rinux-WM auto-start added to $CONFIG_FILE"
 else
-    echo "Rinux-WM launch command already present in init file."
+    echo " [SKIP] Rinux-WM launch command already present."
 fi
 
+# Ensure Foot starts up for visual testing
+if ! grep -q "foot &" "$CONFIG_FILE"; then
+    echo "" >> "$CONFIG_FILE"
+    echo "# Auto-start foot terminal for testing" >> "$CONFIG_FILE"
+    echo "foot &" >> "$CONFIG_FILE"
+    echo " [+] Config updated: Foot terminal auto-start added to $CONFIG_FILE"
+else
+    echo " [SKIP] Foot auto-start command already present."
+fi
+
+echo "---"
 echo "SUCCESS: River built on stable tag ${RIVER_TAG} and workspace ready."
+echo "Your River configuration has been automated to start your WM and a terminal."

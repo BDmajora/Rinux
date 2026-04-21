@@ -19,8 +19,12 @@ public:
     void run();
 
     void handle_global(wl_registry* registry, uint32_t name, const char* interface, uint32_t version);
-    void handle_manage_start();
-    void handle_render_start();
+    
+    // protocol events for river_window_manager_v1
+    void handle_window(river_window_v1* window);
+    void handle_output(river_output_v1* output);
+    void handle_seat(river_seat_v1* seat);
+    void handle_unavailable();
 
 private:
     wl_display* display = nullptr;

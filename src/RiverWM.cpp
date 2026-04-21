@@ -1,6 +1,7 @@
 #include "../include/RiverWM.hpp"
 #include <cstring>
 
+// --- Registry Listeners ---
 static void registry_global(void* data, wl_registry* reg, uint32_t name, const char* intf, uint32_t ver) {
     static_cast<RiverWM*>(data)->handle_global(reg, name, intf, ver);
 }
@@ -11,20 +12,37 @@ static const wl_registry_listener registry_listener = {
     registry_global_remove
 };
 
-static void wm_manage_start(void* data, river_window_manager_v1* wm) {
-    static_cast<RiverWM*>(data)->handle_manage_start();
-}
-static void wm_render_start(void* data, river_window_manager_v1* wm) {
-    static_cast<RiverWM*>(data)->handle_render_start();
-}
-static void wm_manage_finish(void* data, river_window_manager_v1* wm) {}
-static void wm_render_finish(void* data, river_window_manager_v1* wm) {}
+// --- Window Manager Callbacks ---
 
+// unavailable: 2 args (data, resource)
+static void wm_unavailable(void* data, river_window_manager_v1* wm) {
+    static_cast<RiverWM*>(data)->handle_unavailable();
+}
+
+// window: 3 args (data, resource, new_id)
+static void wm_window(void* data, river_window_manager_v1* wm, river_window_v1* window) {
+    static_cast<RiverWM*>(data)->handle_window(window);
+}
+
+// output: 3 args (data, resource, new_id)
+static void wm_output(void* data, river_window_manager_v1* wm, river_output_v1* output) {
+    static_cast<RiverWM*>(data)->handle_output(output);
+}
+
+// seat: 3 args (data, resource, new_id)
+static void wm_seat(void* data, river_window_manager_v1* wm, river_seat_v1* seat) {
+    static_cast<RiverWM*>(data)->handle_seat(seat);
+}
+
+/**
+ * THE FIXED LISTENER
+ * We use designated initializers to ensure functions map to the correct protocol slots.
+ */
 static const river_window_manager_v1_listener wm_listener = {
-    wm_manage_start,
-    wm_manage_finish,
-    wm_render_start,
-    wm_render_finish
+    .unavailable = wm_unavailable,
+    .window      = wm_window,
+    .output      = wm_output,
+    .seat        = wm_seat
 };
 
 RiverWM::RiverWM() {}
@@ -37,19 +55,13 @@ RiverWM::~RiverWM() {
 
 bool RiverWM::connect() {
     display = wl_display_connect(nullptr);
-    if (!display) {
-        std::cerr << "Failed to connect to Wayland display." << std::endl;
-        return false;
-    }
+    if (!display) return false;
 
     registry = wl_display_get_registry(display);
     wl_registry_add_listener(registry, &registry_listener, this);
     wl_display_roundtrip(display);
 
-    if (!river_wm) {
-        std::cerr << "River protocol not found. Is River running?" << std::endl;
-        return false;
-    }
+    if (!river_wm) return false;
 
     river_window_manager_v1_add_listener(river_wm, &wm_listener, this);
     return true;
@@ -63,10 +75,24 @@ void RiverWM::handle_global(wl_registry* reg, uint32_t name, const char* intf, u
     }
 }
 
-void RiverWM::handle_manage_start() {}
+void RiverWM::handle_window(river_window_v1* window) {
+    std::cout << "New window detected!" << std::endl;
+    views.push_back(new View{window});
+    
+    // Basic window setup
+    river_window_v1_set_dimension_bounds(window, 800, 600);
+}
 
-void RiverWM::handle_render_start() {
-    river_window_manager_v1_render_finish(river_wm);
+void RiverWM::handle_output(river_output_v1* output) {
+    std::cout << "New output detected!" << std::endl;
+}
+
+void RiverWM::handle_seat(river_seat_v1* seat) {
+    std::cout << "New seat (input device group) detected!" << std::endl;
+}
+
+void RiverWM::handle_unavailable() {
+    std::cerr << "River window management protocol is no longer available!" << std::endl;
 }
 
 void RiverWM::run() {
