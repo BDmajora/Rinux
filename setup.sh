@@ -2,21 +2,25 @@
 set -e
 
 # --- 1. Install Build Dependencies ---
-echo "Installing dependencies for Debian 13..."
+echo "Installing dependencies for Ubuntu 25.10..."
 sudo apt update
 sudo apt install -y \
-    git \
     build-essential \
-    pkg-config \
-    wayland-protocols \
+    gcc \
+    g++ \
     libwayland-dev \
-    libwlroots-dev \
-    libinput-dev \
+    libwayland-bin \
+    wayland-protocols \
+    pkg-config \
+    libwlroots-0.18-dev \
     libxkbcommon-dev \
     libpixman-1-dev \
+    libinput-dev \
     libudev-dev \
-    libevdev-dev \
+    libgbm-dev \
     wget \
+    git \
+    scdoc \
     zig
 
 # --- 2. Build River ---
@@ -25,7 +29,7 @@ if [ ! -d "river" ]; then
 fi
 
 cd river
-# clean any previous attempts
+# Clear previous build artifacts
 rm -rf .zig-cache zig-out
 
 echo "Building River..."
@@ -37,9 +41,10 @@ sudo cp zig-out/bin/riverctl /usr/local/bin/
 cd ..
 
 # --- 3. Configuration ---
+echo "Setting up River configuration..."
 mkdir -p ~/.config/river
 if [ ! -f ~/.config/river/init ]; then
-    # try to grab the example from the source folder we just downloaded
+    # Use the example init from the cloned source
     cp river/example/init ~/.config/river/init
     chmod +x ~/.config/river/init
 fi
