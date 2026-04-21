@@ -23,9 +23,10 @@
           libxkbcommon
           pixman
           libinput
-          libevdev
+          libevdev.dev
           libcap
           mesa
+          libglvnd
           libusb1 # Added for your USB Bridge project
         ];
         
