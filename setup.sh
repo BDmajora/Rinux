@@ -1,62 +1,43 @@
 #!/bin/bash
 set -e
 
-# --- 1. System Prep ---
-echo "--- 1. Updating Debian 13 & Installing Base Tools ---"
+# --- 1. System Prep & Repository Setup ---
+echo "--- 1. Adding River Repository & Installing Base Tools ---"
 sudo apt update
-sudo apt install -y curl git build-essential xdg-utils
+sudo apt install -y curl git build-essential xdg-utils wget
 
-# --- 2. Robust Nix Check ---
-# Check if nix is in PATH or if the installation directory exists
-NIX_PROFILE="/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+# Install repository GPG key
+sudo wget -O /usr/share/keyrings/nickh-archive-keyring.gpg https://www.ne.jp/asahi/nickh/debian/nickh-archive-keyring.gpg
 
-if command -v nix &> /dev/null; then
-    echo "--- 2. Nix is already in PATH. Skipping installation. ---"
-elif [ -e "$NIX_PROFILE" ]; then
-    echo "--- 2. Nix is installed but not in PATH. Sourcing now... ---"
-    . "$NIX_PROFILE"
-else
-    echo "--- 2. Installing Nix (Daemon Mode) ---"
-    # Handling the collision case: if an old failed install left backup files
-    if [ -f "/etc/bash.bashrc.backup-before-nix" ]; then
-        echo "Warning: Old Nix backup found. Cleaning up to allow fresh install..."
-        sudo rm -f /etc/bash.bashrc.backup-before-nix
-    fi
-    
-    curl -L https://nixos.org/nix/install | sh -s -- --daemon
-    . "$NIX_PROFILE"
+# Add repository source
+sudo wget -O /etc/apt/sources.list.d/nickh.sources https://www.ne.jp/asahi/nickh/debian/nickh.sources
+
+# --- 2. Install River ---
+echo "--- 2. Installing River ---"
+sudo apt update
+sudo apt install -y river
+
+# --- 3. Configuration ---
+echo "--- 3. Setting up River Configuration ---"
+mkdir -p ~/.config/river
+
+# Extract example init file
+if [ ! -f ~/.config/river/init ]; then
+    zcat /usr/share/doc/river/example/init.gz > ~/.config/river/init
+    chmod +x ~/.config/river/init
 fi
 
-# Enable Flakes
-mkdir -p ~/.config/nix
-if ! grep -q "experimental-features = nix-command flakes" ~/.config/nix/nix.conf 2>/dev/null; then
-    echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
-fi
-
-# --- 3. Build River ---
-echo "--- 3. Building River Compositor ---"
-nix develop --extra-experimental-features "nix-command flakes" --command bash -c "
-    if [ ! -d 'river' ]; then
-        git clone --recursive https://github.com/riverwm/river
-    fi
-    cd river
-    
-    # CRITICAL: Clean the cache that caused the Wayland header errors
-    rm -rf .zig-cache zig-out
-    
-    zig build -Doptimize=ReleaseSafe
-    
-    echo 'Installing River binaries...'
-    sudo cp zig-out/bin/river /usr/local/bin/
-    sudo cp zig-out/bin/riverctl /usr/local/bin/
-"
-
-# --- 4. Scaffolding ---
+# --- 4. Scaffolding (Rinux Project) ---
 echo "--- 4. Setting up Rinux Project Structure ---"
+mkdir -p ~/Rinux
+cd ~/Rinux
+
 mkdir -p protocol src include
+
+# Download protocol definitions
 if [ ! -f "protocol/river-window-management-v1.xml" ]; then
     wget -q https://raw.githubusercontent.com/riverwm/river/master/protocol/river-window-management-v1.xml \
          -O protocol/river-window-management-v1.xml
 fi
 
-echo "--- SUCCESS: Rinux Workspace Ready ---"
+echo "--- SUCCESS: River installed and Rinux Workspace Ready ---"
