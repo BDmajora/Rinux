@@ -10,11 +10,11 @@
     in {
       devShells.${system}.default = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
-          zig_0_13
+          zig # Updated to 0.14+ to match River source
           pkg-config
           wayland-scanner
           scdoc
-          gcc # Added for your C++ WM logic
+          gcc
         ];
         buildInputs = with pkgs; [
           wlroots_0_18
@@ -25,6 +25,7 @@
           libinput
           libcap
           mesa
+          libusb1 # Added for your USB Bridge project
         ];
         
         shellHook = ''
