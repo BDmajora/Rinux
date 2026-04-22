@@ -6,9 +6,9 @@ echo "Installing system dependencies..."
 sudo apt update
 sudo apt install -y build-essential gcc g++ libwayland-dev libwayland-bin wayland-protocols pkg-config libwlroots-0.18-dev libxkbcommon-dev libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git scdoc foot wine
 
-# --- 2. Install Zig 0.12.0 ---
-# This version is the most stable target for River 0.4.0's codebase.
-ZIG_VERSION="0.12.0"
+# --- 2. Install Zig 0.11.0 ---
+# This version perfectly matches the River v0.4.0 codebase requirements.
+ZIG_VERSION="0.11.0"
 if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
     echo "Installing Zig ${ZIG_VERSION}..."
     wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
@@ -18,21 +18,22 @@ if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]];
     sudo ln -sf /opt/zig/zig /usr/local/bin/zig
     rm "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
 fi
-echo "Zig version: $(zig version)"
+echo "Current Zig version: $(zig version)"
 
 # --- 3. River Setup (Tagged v0.4.0) ---
 if [ ! -d "river" ]; then
     git clone --recursive https://codeberg.org/river/river.git
 fi
 cd river
+# Ensure we have a clean slate for v0.4.0
 git fetch --tags
-git checkout v0.4.0
+git reset --hard v0.4.0
 git submodule update --init --recursive
 
 # --- 4. Build & Install ---
-echo "Building River v0.4.0 with Zig 0.12.0..."
+echo "Building River v0.4.0 with Zig 0.11.0..."
 rm -rf .zig-cache zig-out
-# Using Zig 0.12.0 allows the original build.zig and dependencies to run as intended.
+# River v0.4.0 on Zig 0.11.0 should build with zero manual patches.
 zig build -Doptimize=ReleaseSafe
 
 echo "Installing binaries..."
@@ -57,10 +58,9 @@ if ! grep -q "rinux-wm" ~/.config/river/init; then
 $HOME/Rinux/rinux-wm > /tmp/rinux.log 2>&1 &
 sleep 2
 riverctl csd-filter-add "wine*"
-riverctl rule-add -app-id "wine*" float
 riverctl background-color 0x4682b4
 riverctl spawn "env -u DISPLAY WINEWAYLAND=1 wine explorer /desktop=shell,1280x800"
 EOF
 fi
 
-echo "Build complete. River v0.4.0 is installed using Zig 0.12.0."
+echo "Success. River v0.4.0 is now installed via Zig 0.11.0."
