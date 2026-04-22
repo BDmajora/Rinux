@@ -23,7 +23,8 @@ sudo apt install -y \
     wget \
     git \
     scdoc \
-    foot
+    foot \
+    wine 
 
 # --- 2. Install Zig 0.13.0 ---
 ZIG_VERSION="0.13.0"
