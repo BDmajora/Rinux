@@ -1,7 +1,7 @@
 #include "../include/RiverWM.hpp"
 #include <cstring>
 
-// --- Wayland Output Listeners ---
+// Output management
 static void output_geometry(void* data, wl_output* out, int32_t x, int32_t y, int32_t pw, int32_t ph, int32_t sub, const char* make, const char* model, int32_t trans) {}
 static void output_done(void* data, wl_output* out) {}
 static void output_scale(void* data, wl_output* out, int32_t factor) {}
@@ -16,7 +16,7 @@ static const wl_output_listener output_listener = {
     output_geometry, output_mode, output_done, output_scale
 };
 
-// --- Registry Listeners ---
+// Registry listeners
 static void registry_global(void* data, wl_registry* reg, uint32_t name, const char* intf, uint32_t ver) {
     static_cast<RiverWM*>(data)->handle_global(reg, name, intf, ver);
 }
@@ -26,7 +26,7 @@ static const wl_registry_listener registry_listener = {
     registry_global, registry_global_remove
 };
 
-// --- Window Manager Callbacks ---
+// River protocol callbacks
 static void wm_unavailable(void* data, river_window_manager_v1* wm) {
     static_cast<RiverWM*>(data)->handle_unavailable();
 }
@@ -87,15 +87,12 @@ void RiverWM::set_resolution(int w, int h) {
 
 void RiverWM::handle_window(river_window_v1* window) {
     views.push_back(new View{window});
-
-    // CRITICAL FIX: We use the guaranteed-to-compile dimension bounds, 
-    // but only force it on the very first window (the desktop background).
+    
+    // Log detection of explorer surfaces
     if (views.size() == 1) {
-        std::cout << "[Rinux] Locking Primary Desktop to " << screen_width << "x" << screen_height << std::endl;
-        river_window_v1_set_dimension_bounds(window, screen_width, screen_height);
+        std::cout << "[Rinux] Wine Desktop Root detected." << std::endl;
     } else {
-        // Taskbar/Start Menu fall in here. They map naturally.
-        std::cout << "[Rinux] Shell component detected and allowed to overlay." << std::endl;
+        std::cout << "[Rinux] Shell component mapped." << std::endl;
     }
 }
 
