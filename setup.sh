@@ -16,36 +16,19 @@ if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]];
     sudo ln -sf /opt/zig/zig /usr/local/bin/zig
 fi
 
-# --- 3. River Setup ---
-RIVER_TAG="v0.4.0"
-[ ! -d "river" ] && git clone --recursive https://codeberg.org/river/river.git
+# --- 3. River Setup (Master Branch) ---
+if [ ! -d "river" ]; then
+    git clone --recursive https://codeberg.org/river/river.git
+fi
 cd river
-git fetch --tags
-git checkout "$RIVER_TAG"
+git fetch
+git checkout master
 git submodule update --init --recursive
 
-# --- 4. The Surgical Patches ---
-
-# Fix A: Decouple build.zig from build.zig.zon
-echo "Patching build.zig to hardcode version..."
-sed -i 's/const manifest = @import("build.zig.zon");/\/\/ manifest removed/' build.zig
-sed -i 's/const version = manifest.version;/const version = "0.4.0";/' build.zig
-
-# Fix B: Fetch dependencies so they exist in the cache
-echo "Fetching dependencies..."
-zig build --fetch || true
-
-# Fix C: Recursively unlock the cache directories and patch the error
-echo "Unlocking Zig cache directories..."
-chmod -R u+w ~/.cache/zig/p/ 2>/dev/null || true
-
-echo "Patching cached dependencies for Zig 0.14.0 compatibility..."
-# Use a more robust sed pattern to catch .empty regardless of surrounding whitespace
-find ~/.cache/zig/p -name "scanner.zig" -exec sed -i 's/\.empty/.{}/g' {} + 2>/dev/null || true
-
-# --- 5. Build & Install ---
-echo "Building River with Zig 0.14.0..."
+# --- 4. Build & Install ---
+echo "Building River (master) with Zig 0.14.0..."
 rm -rf .zig-cache zig-out
+# No patches needed—master is 0.14.0 compatible
 zig build -Doptimize=ReleaseSafe
 
 echo "Installing binaries..."
@@ -53,10 +36,7 @@ sudo cp zig-out/bin/river /usr/local/bin/
 sudo cp zig-out/bin/riverctl /usr/local/bin/
 cd ..
 
-# --- 6. Protocols & Config ---
-mkdir -p protocol
-wget -q "https://codeberg.org/river/river/raw/tag/${RIVER_TAG}/protocol/river-window-management-v1.xml" -O protocol/river-window-management-v1.xml
-
+# --- 5. Config ---
 mkdir -p ~/.config/river
 [ ! -f ~/.config/river/init ] && cp river/example/init ~/.config/river/init && chmod +x ~/.config/river/init
 
@@ -72,4 +52,4 @@ riverctl spawn "env -u DISPLAY WINEWAYLAND=1 wine explorer /desktop=shell,1280x8
 EOF
 fi
 
-echo "River 0.4.0 successfully forced onto Zig 0.14.0."
+echo "River (master) successfully built and installed."
