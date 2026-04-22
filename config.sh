@@ -1,43 +1,40 @@
 #!/bin/sh
-# config.sh - Updated for Wine Autoboot
+# config.sh - Optimized for Wine 10 + Wayland Driver
 
 CONFIG_DIR="$HOME/.config/river"
 mkdir -p "$CONFIG_DIR"
 RINUX_BIN="$HOME/Rinux/rinux-wm"
 TERM_CMD="foot"
 
-# Define the Wine Desktop resolution to match your C++ code
 RES_W=1280
 RES_H=800
 
 cat <<EOF > "$CONFIG_DIR/init"
 #!/bin/sh
 
-# 1. Launch the C++ Window Manager Host
+# 1. Force Wine 10 to use Wayland by unsetting DISPLAY
+# 2. Disable DXVK/VKD3D and force GDI for stability in your tools
+unset DISPLAY
+export WINEDEBUG=-all
+export WINE_VIDEO_UPPER_BOUNDS=0 # Helps some apps avoid DXVK hooks
+export RENDERER=gdi 
+
+# 3. Start your C++ WM Host
 $RINUX_BIN &
 
-# 2. Wait a split second for the WM to register with the compositor
+# 4. Give the compositor a moment to breathe
 sleep 0.5
 
-# 3. Autoboot Wine Virtual Desktop
-# This creates a "monocle" style Wine environment
-wine explorer /desktop=Rinux,${RES_W}x${RES_H} &
-
-# 4. Native River Rules & Styles
+# 5. Native River Rules
 riverctl default-border-width 2
-riverctl border-color-focused 0x93a1a1
-riverctl border-color-unfocused 0x586e75
-
-# 5. Keybindings
-riverctl map normal Super Q close
-riverctl map normal Super E exit
-riverctl map normal Super Return spawn $TERM_CMD
-
-# Default background
 riverctl background-color 0x002b36
+riverctl map normal Super Return spawn $TERM_CMD
+riverctl map normal Super E exit
+
+# 6. The "Smoke and Mirrors" Desktop
+# Using 'env -u' as a double-safety to ensure DISPLAY is gone for this process
+env -u DISPLAY wine explorer /desktop=Rinux,${RES_W}x${RES_H} > /tmp/rinux-boot.log 2>&1 &
+
 EOF
 
 chmod +x "$CONFIG_DIR/init"
-echo "River configuration reset."
-echo "Autoboot set: Wine Virtual Desktop ($RES_W x $RES_H)"
-echo "Emergency Terminal: Super+Return | Exit: Super+E"
