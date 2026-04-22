@@ -1,51 +1,41 @@
 #!/bin/bash
 set -e
 
-# --- 1. Dependencies ---
-# libwlroots-0.18-dev is the specific package for Ubuntu 25.10.
+# --- 1. System Runtime Dependencies ---
+# You still need these to run the binary and handle your Rinux setup.
+echo "Installing runtime dependencies..."
 sudo apt update
-sudo apt install -y build-essential gcc g++ libwayland-dev libwayland-bin \
-    wayland-protocols pkg-config libwlroots-0.18-dev libxkbcommon-dev \
-    libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git scdoc wine
+sudo apt install -y libwayland-client0 libwlroots-0.18-dev libxkbcommon0 \
+    libpixman-1-0 libinput10 libudev1 libgbm1 wget git wine scdoc
 
-# --- 2. Install Zig 0.13.0 ---
-# Pinned to 0.13.0 for River v0.4.0 compatibility.
-ZIG_VERSION="0.13.0"
-if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
-    echo "Installing Zig ${ZIG_VERSION}..."
-    wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
-    tar -xf "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
-    sudo rm -rf /opt/zig && sudo mv "zig-linux-x86_64-${ZIG_VERSION}" /opt/zig
-    sudo ln -sf /opt/zig/zig /usr/local/bin/zig
-    rm "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
-fi
+# --- 2. Download Pre-compiled River v0.4.0 ---
+# This avoids all Zig version and "expected string literal" errors.
+echo "Downloading River v0.4.0 binary..."
+TEMP_DIR=$(mktemp -d)
+cd "$TEMP_DIR"
+wget -q https://codeberg.org/river/river/releases/download/v0.4.0/river-v0.4.0-linux-x86_64.tar.gz
 
-# --- 3. River Setup (v0.4.0) ---
-if [ ! -d "river" ]; then
-    git clone --recursive https://codeberg.org/river/river.git
-fi
-cd river
-git fetch --tags
-git reset --hard v0.4.0
-git submodule update --init --recursive
+# --- 3. Install Binaries ---
+echo "Extracting and installing to /usr/local/bin..."
+tar -xf river-v0.4.0-linux-x86_64.tar.gz
+sudo cp river-v0.4.0-linux-x86_64/river /usr/local/bin/
+sudo cp river-v0.4.0-linux-x86_64/riverctl /usr/local/bin/
+sudo cp river-v0.4.0-linux-x86_64/rivertile /usr/local/bin/
 
-# --- 4. Build & Install ---
-# v0.4.0 build using Zig 0.13.0.
-rm -rf .zig-cache zig-out
-zig build -Doptimize=ReleaseSafe
+# Install man pages so you have documentation
+sudo cp river-v0.4.0-linux-x86_64/river.1 /usr/local/share/man/man1/
+sudo cp river-v0.4.0-linux-x86_64/riverctl.1 /usr/local/share/man/man1/
 
-echo "Installing binaries..."
-sudo cp zig-out/bin/river /usr/local/bin/
-sudo cp zig-out/bin/riverctl /usr/local/bin/
-cd ..
-
-# --- 5. Configuration ---
+# --- 4. Configuration Cleanup ---
 mkdir -p ~/.config/river
+
+# If the init file doesn't exist, grab the default from the binary pack
 if [ ! -f ~/.config/river/init ]; then
-    cp river/example/init ~/.config/river/init
+    cp river-v0.4.0-linux-x86_64/init.example ~/.config/river/init
     chmod +x ~/.config/river/init
 fi
 
+# --- 5. Apply Rinux Customizations ---
 if ! grep -q "rinux-wm" ~/.config/river/init; then
     cat >> ~/.config/river/init <<'EOF'
 
@@ -58,4 +48,4 @@ riverctl spawn "env -u DISPLAY WINEWAYLAND=1 wine explorer /desktop=shell,1280x8
 EOF
 fi
 
-echo "Build complete using Zig 0.13.0 and wlroots 0.18 headers."
+echo "Done. You can now start River by typing 'river' in your TTY."
