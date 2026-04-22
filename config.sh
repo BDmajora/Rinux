@@ -13,16 +13,12 @@ cat <<EOF > "$CONFIG_DIR/init"
 # 1. Start Rinux-WM C++ Host
 $RINUX_BIN &
 
-# 2. Configure Wine for Full Shell Mode
+# 2. Configure Wine Graphics
 wine reg add "HKCU\\Software\\Wine\\Drivers" /v Graphics /t REG_SZ /d "wayland,x11" /f
-wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon" /v "Shell" /t REG_SZ /d "explorer.exe" /f
 
 # 3. Native OS River Rules
 riverctl default-border-width 0
 riverctl csd-filter-add "wine*"
-
-# MUST BE FLOAT: The C++ code forces the desktop to screen size.
-# Floating allows the taskbar to sit on top of that desktop without being stretched.
 riverctl rule-add -app-id "wine*" float
 
 # 4. Keybindings
@@ -31,11 +27,13 @@ riverctl map normal Super Return spawn foot
 riverctl map normal Super E exit
 
 # 5. Launch the Wine Environment
-env DISPLAY= wine explorer /desktop=Rinux,1280x800 &
+# The secret is 'explorer.exe /desktop' at the end. 
+# Without the /desktop flag, Wine just opens a file browser window.
+env DISPLAY= wine explorer /desktop=Rinux,1280x800 explorer.exe /desktop &
 
 riverctl background-color 0x000000
 EOF
 
 chmod +x "$CONFIG_DIR/init"
 echo "---"
-echo "Config complete. Run 'river' for the Fullscreen Native experience."
+echo "Config complete. Run 'river' for the Wine Taskbar experience."
