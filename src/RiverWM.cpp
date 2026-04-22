@@ -116,12 +116,6 @@ void RiverWM::handle_window(river_window_v1* window) {
 
 void RiverWM::handle_output(river_output_v1* output) {
     outputs.push_back(output);
-    
-    // FIX: Trigger a manage sequence if windows were created before the output was ready.
-    // This ensures Wine gets mapped the moment the display is detected.
-    if (!views.empty() && river_wm) {
-        river_window_manager_v1_manage_dirty(river_wm);
-    }
 }
 
 void RiverWM::handle_manage_start() {
@@ -137,9 +131,14 @@ void RiverWM::layout() {
     if (views.empty() || outputs.empty()) return;
 
     for (auto const& v : views) {
-        // Monocle mode logic
+        // 1. Assign to output and set size in one call.
+        // This is the most reliable "Monocle" method in this protocol version.
         river_window_v1_fullscreen(v->handle, outputs[0]);
+        
+        // 2. Set node position (0,0 relative to the output)
         river_node_v1_set_position(v->node, 0, 0);
+
+        // 3. Make visible
         river_window_v1_show(v->handle);
     }
 }
