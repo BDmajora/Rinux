@@ -1,7 +1,7 @@
 #include "../include/RiverWM.hpp"
 #include <cstring>
 
-// --- Wayland Output Listeners ---
+// --- Wayland Output Listeners (Resolution detection) ---
 static void output_geometry(void* data, wl_output* out, int32_t x, int32_t y, int32_t pw, int32_t ph, int32_t sub, const char* make, const char* model, int32_t trans) {}
 static void output_done(void* data, wl_output* out) {}
 static void output_scale(void* data, wl_output* out, int32_t factor) {}
@@ -83,20 +83,14 @@ void RiverWM::handle_global(wl_registry* reg, uint32_t name, const char* intf, u
 void RiverWM::set_resolution(int w, int h) {
     screen_width = w;
     screen_height = h;
+    std::cout << "Resolution locked: " << w << "x" << h << std::endl;
 }
 
 void RiverWM::handle_window(river_window_v1* window) {
+    std::cout << "Wine/App Window mapped. Scaling to screen." << std::endl;
     views.push_back(new View{window});
-
-    // Handle the Desktop layer
-    if (views.size() == 1) {
-        std::cout << "[Rinux] Primary Desktop detected. Triggering Fullscreen Layer." << std::endl;
-        // Instead of just setting dimensions, we use the protocol's fullscreen state
-        river_window_v1_set_fullscreen(window, nullptr);
-    } else {
-        // Taskbar/Start Menu - Let them manage their own sizing/placement
-        std::cout << "[Rinux] Shell component mapped." << std::endl;
-    }
+    // Dynamically size to the screen resolution detected earlier
+    river_window_v1_set_dimension_bounds(window, screen_width, screen_height);
 }
 
 void RiverWM::handle_output(river_output_v1* output) {}
@@ -104,6 +98,6 @@ void RiverWM::handle_seat(river_seat_v1* seat) {}
 void RiverWM::handle_unavailable() { exit(0); }
 
 void RiverWM::run() {
-    std::cout << "Rinux Host active..." << std::endl;
+    std::cout << "Rinux (Wine-DE Host) active..." << std::endl;
     while (wl_display_dispatch(display) != -1) {}
 }
