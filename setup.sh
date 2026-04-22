@@ -25,7 +25,7 @@ sudo apt install -y \
     foot \
     wine
 
-# --- 2. Install Zig 0.14.0 (required by River 0.4.0) ---
+# --- 2. Install Zig 0.14.0 ---
 ZIG_VERSION="0.14.0"
 if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
     echo "Installing Zig ${ZIG_VERSION}..."
@@ -54,10 +54,11 @@ git fetch --tags
 git checkout "$RIVER_TAG"
 git submodule update --init --recursive
 
-# PATCH: Fix Zig 0.14.0 'known result type' error for ZON import
-# This satisfies the new compiler requirement for explicit struct types on ZON imports.
+# PATCH: Bypass the ZON import entirely to avoid strict type-checking errors in 0.14.0.
+# We remove the import line and hardcode the version string that the build uses.
 echo "Patching build.zig for Zig 0.14.0 compatibility..."
-sed -i 's/const manifest = @import("build.zig.zon");/const manifest: struct { version: []const u8 } = @import("build.zig.zon");/' build.zig
+sed -i 's/const manifest = @import("build.zig.zon");/\/\/ Removed ZON import/' build.zig
+sed -i 's/const version = manifest.version;/const version = "0.4.0";/' build.zig
 
 # Clear previous build artifacts
 rm -rf .zig-cache zig-out
@@ -89,8 +90,6 @@ echo "Downloading River 0.4.0 window management protocol..."
 wget -q "https://codeberg.org/river/river/raw/tag/${RIVER_TAG}/protocol/river-window-management-v1.xml" \
     -O protocol/river-window-management-v1.xml
 
-echo "Protocol saved to protocol/river-window-management-v1.xml"
-
 # --- 6. Update River init ---
 echo "Updating River init config..."
 CONFIG_FILE="$HOME/.config/river/init"
@@ -109,11 +108,8 @@ riverctl background-color 0x4682b4
 riverctl spawn "env -u DISPLAY WINEWAYLAND=1 wine explorer /desktop=shell,1280x800"
 EOF
     echo "[+] Config updated: Rinux-WM added to $CONFIG_FILE"
-else
-    echo "[SKIP] Rinux-WM already present in config."
 fi
 
 echo "---"
 echo "SUCCESS: River ${RIVER_TAG} built and installed."
 echo "Now run: cd ~/Rinux && ./build.sh"
-echo "Then restart River to test."
