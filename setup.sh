@@ -35,10 +35,11 @@ sed -i 's/const version = manifest.version;/const version = "0.4.0";/' build.zig
 echo "Fetching dependencies..."
 zig build --fetch || true
 
-# Fix C: Unlock and patch the 'ArrayList.empty' error in the global cache
+# Fix C: Recursively unlock the cache directories and patch the error
+echo "Unlocking Zig cache directories..."
+chmod -R u+w ~/.cache/zig/p/ 2>/dev/null || true
+
 echo "Patching cached dependencies for Zig 0.14.0 compatibility..."
-# Find files, grant write permission, then replace .empty with .{}
-find ~/.cache/zig/p -name "scanner.zig" -exec chmod u+w {} + 2>/dev/null || true
 find ~/.cache/zig/p -name "scanner.zig" -exec sed -i 's/\.empty/.{}/g' {} + 2>/dev/null || true
 
 # --- 5. Build & Install ---
