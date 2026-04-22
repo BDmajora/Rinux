@@ -1,5 +1,5 @@
 #!/bin/sh
-# config.sh - Optimized for Wine 10 + Wayland Driver
+# config.sh - Using riverctl spawn for Wine 11 Autoboot
 
 CONFIG_DIR="$HOME/.config/river"
 mkdir -p "$CONFIG_DIR"
@@ -12,28 +12,20 @@ RES_H=800
 cat <<EOF > "$CONFIG_DIR/init"
 #!/bin/sh
 
-# 1. Force Wine 10 to use Wayland by unsetting DISPLAY
-# 2. Disable DXVK/VKD3D and force GDI for stability in your tools
-unset DISPLAY
-export WINEDEBUG=-all
-export WINE_VIDEO_UPPER_BOUNDS=0 # Helps some apps avoid DXVK hooks
-export RENDERER=gdi 
+# 1. Start your C++ WM Host
+$RINUX_BIN > /tmp/rinux-wm.log 2>&1 &
 
-# 3. Start your C++ WM Host
-$RINUX_BIN &
+# 2. Wait for River/Rinux to settle
+sleep 1.5
 
-# 4. Give the compositor a moment to breathe
-sleep 0.5
-
-# 5. Native River Rules
-riverctl default-border-width 2
-riverctl background-color 0x002b36
+# 3. Native River Rules
+riverctl default-border-width 0
 riverctl map normal Super Return spawn $TERM_CMD
 riverctl map normal Super E exit
 
-# 6. The "Smoke and Mirrors" Desktop
-# Using 'env -u' as a double-safety to ensure DISPLAY is gone for this process
-env -u DISPLAY wine explorer /desktop=Rinux,${RES_W}x${RES_H} > /tmp/rinux-boot.log 2>&1 &
+# 4. Autoboot the Desktop via riverctl spawn!
+# This forces River to launch it just like it would if you pressed a keybind
+riverctl spawn "env -u DISPLAY WINEWAYLAND=1 RENDERER=gdi wine explorer /desktop=Rinux,${RES_W}x${RES_H}"
 
 EOF
 
