@@ -111,6 +111,7 @@ void RiverWM::handle_window(river_window_v1* window) {
     View* v = new View{window, river_window_v1_get_node(window)};
     views.push_back(v);
     
+    // Alert compositor that layout logic needs to run
     if (river_wm) river_window_manager_v1_manage_dirty(river_wm);
 }
 
@@ -131,14 +132,16 @@ void RiverWM::layout() {
     if (views.empty() || outputs.empty()) return;
 
     for (auto const& v : views) {
-        // 1. Assign to output and set size in one call.
-        // This is the most reliable "Monocle" method in this protocol version.
-        river_window_v1_fullscreen(v->handle, outputs[0]);
+        // FIX: Use the node handle to set the output, not the window handle
+        river_node_v1_set_output(v->node, outputs[0]);
         
-        // 2. Set node position (0,0 relative to the output)
+        // Window management state: set dimensions
+        river_window_v1_propose_dimensions(v->handle, screen_width, screen_height);
+        
+        // Rendering state: set position on the node
         river_node_v1_set_position(v->node, 0, 0);
 
-        // 3. Make visible
+        // Make the window visible
         river_window_v1_show(v->handle);
     }
 }
