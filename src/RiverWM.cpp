@@ -1,5 +1,6 @@
 #include "../include/RiverWM.hpp"
 #include <cstring>
+#include <algorithm>
 
 // --- Wayland Output Listeners ---
 static void output_geometry(void* data, wl_output* out, int32_t x, int32_t y, int32_t pw, int32_t ph, int32_t sub, const char* make, const char* model, int32_t trans) {}
@@ -8,6 +9,7 @@ static void output_scale(void* data, wl_output* out, int32_t factor) {}
 
 static void output_mode(void* data, wl_output* out, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
     if (flags & WL_OUTPUT_MODE_CURRENT) {
+        // Update internal state with actual monitor resolution
         static_cast<RiverWM*>(data)->set_resolution(width, height);
     }
 }
@@ -53,6 +55,8 @@ static const river_window_manager_v1_listener wm_listener = {
 RiverWM::RiverWM() {}
 
 RiverWM::~RiverWM() {
+    // Clean up allocated views
+    for (auto v : views) delete v;
     if (river_wm) river_window_manager_v1_destroy(river_wm);
     if (registry) wl_registry_destroy(registry);
     if (display) wl_display_disconnect(display);
@@ -83,12 +87,28 @@ void RiverWM::handle_global(wl_registry* reg, uint32_t name, const char* intf, u
 void RiverWM::set_resolution(int w, int h) {
     screen_width = w;
     screen_height = h;
+    layout(); // Instantly resize windows if monitor resolution changes
 }
 
 void RiverWM::handle_window(river_window_v1* window) {
-    // Generic view tracking
-    views.push_back(new View{window});
-    std::cout << "[Rinux] New view managed. Total: " << views.size() << std::endl;
+    // Add window to our managed list
+    View* v = new View{window};
+    views.push_back(v);
+
+    std::cout << "[Rinux] Managing window (Monocle Mode). Total: " << views.size() << std::endl;
+
+    // Trigger immediate layout to map the window
+    layout();
+}
+
+void RiverWM::layout() {
+    if (views.empty()) return;
+
+    // MONOCLE LAYOUT: Every window is forced to fill the entire screen.
+    // This is ideal for Wine Virtual Desktops or "Gaming" modes.
+    for (auto const& v : views) {
+        river_window_v1_set_geometry(v->handle, 0, 0, screen_width, screen_height);
+    }
 }
 
 void RiverWM::handle_output(river_output_v1* output) {}
@@ -96,6 +116,7 @@ void RiverWM::handle_seat(river_seat_v1* seat) {}
 void RiverWM::handle_unavailable() { exit(0); }
 
 void RiverWM::run() {
-    std::cout << "Rinux active..." << std::endl;
+    std::cout << "Rinux active in Monocle Mode..." << std::endl;
+    // Main Wayland event loop
     while (wl_display_dispatch(display) != -1) {}
 }
