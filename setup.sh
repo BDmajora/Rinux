@@ -2,7 +2,7 @@
 set -e
 
 # --- 1. Cleanup & Dependencies ---
-echo "Cleaning up old Zig versions and installing dependencies..."
+echo "Cleaning up and installing dependencies..."
 sudo apt remove --purge -y zig || true
 sudo apt update
 sudo apt install -y \
@@ -25,8 +25,10 @@ sudo apt install -y \
     foot \
     wine
 
-# --- 2. Install Zig 0.14.0 ---
-ZIG_VERSION="0.14.0"
+# --- 2. Install Zig 0.13.0 ---
+# This version is required to build River 0.4.0 and its dependencies
+# without running into 0.14.0 standard library breaking changes.
+ZIG_VERSION="0.13.0"
 if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
     echo "Installing Zig ${ZIG_VERSION}..."
     wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
@@ -54,13 +56,8 @@ git fetch --tags
 git checkout "$RIVER_TAG"
 git submodule update --init --recursive
 
-# PATCH: Bypass the ZON import entirely to avoid strict type-checking errors in 0.14.0.
-# We remove the import line and hardcode the version string that the build uses.
-echo "Patching build.zig for Zig 0.14.0 compatibility..."
-sed -i 's/const manifest = @import("build.zig.zon");/\/\/ Removed ZON import/' build.zig
-sed -i 's/const version = manifest.version;/const version = "0.4.0";/' build.zig
-
-# Clear previous build artifacts
+# On 0.13.0, the build scripts and ZON imports work natively. 
+# We do not need the sed patches anymore.
 rm -rf .zig-cache zig-out
 
 echo "Building River ${RIVER_TAG}..."
@@ -104,6 +101,7 @@ $HOME/Rinux/rinux-wm > /tmp/rinux.log 2>&1 &
 sleep 2
 riverctl default-border-width 0
 riverctl csd-filter-add "wine*"
+riverctl rule-add -app-id "wine*" float
 riverctl background-color 0x4682b4
 riverctl spawn "env -u DISPLAY WINEWAYLAND=1 wine explorer /desktop=shell,1280x800"
 EOF
@@ -111,5 +109,5 @@ EOF
 fi
 
 echo "---"
-echo "SUCCESS: River ${RIVER_TAG} built and installed."
+echo "SUCCESS: River ${RIVER_TAG} built and installed using Zig 0.13.0."
 echo "Now run: cd ~/Rinux && ./build.sh"
