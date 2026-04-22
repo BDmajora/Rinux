@@ -3,8 +3,7 @@ set -e
 
 # --- 1. Cleanup & Dependencies ---
 echo "Cleaning up old Zig versions and installing dependencies..."
-# Purge the apt version to ensure our manual install takes precedence
-sudo apt remove --purge -y zig || true 
+sudo apt remove --purge -y zig || true
 sudo apt update
 sudo apt install -y \
     build-essential \
@@ -24,44 +23,48 @@ sudo apt install -y \
     git \
     scdoc \
     foot \
-    wine 
+    wine
 
-# --- 2. Install Zig 0.13.0 ---
+# --- 2. Install Zig 0.13.0 (required by River 0.4.0) ---
 ZIG_VERSION="0.13.0"
 if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
     echo "Installing Zig ${ZIG_VERSION}..."
     wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
     tar -xf "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
-    
     sudo rm -rf /opt/zig
     sudo mv "zig-linux-x86_64-${ZIG_VERSION}" /opt/zig
     sudo ln -sf /opt/zig/zig /usr/local/bin/zig
     rm "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
 fi
 
-# --- 3. Clone & Checkout Stable River ---
-RIVER_TAG="v0.3.5"
+echo "Zig version: $(zig version)"
+
+# --- 3. Clone & Build River 0.4.0 ---
+RIVER_TAG="v0.4.0"
 if [ ! -d "river" ]; then
     echo "Cloning River..."
-    git clone --recursive https://github.com/riverwm/river
+    git clone --recursive https://codeberg.org/river/river.git
 fi
 
 cd river
-echo "Ensuring River is on stable tag ${RIVER_TAG}..."
+echo "Checking out River ${RIVER_TAG}..."
 git fetch --tags
 git checkout "$RIVER_TAG"
 git submodule update --init --recursive
 
-# Clear previous failed build artifacts
+# Clear previous build artifacts
 rm -rf .zig-cache zig-out
 
 echo "Building River ${RIVER_TAG}..."
 zig build -Doptimize=ReleaseSafe
 
-echo "Installing binaries..."
+echo "Installing River binaries..."
 sudo cp zig-out/bin/river /usr/local/bin/
 sudo cp zig-out/bin/riverctl /usr/local/bin/
 cd ..
+
+# Verify
+echo "River version: $(river -version)"
 
 # --- 4. Configuration ---
 echo "Setting up River configuration..."
@@ -71,39 +74,38 @@ if [ ! -f ~/.config/river/init ]; then
     chmod +x ~/.config/river/init
 fi
 
-# --- 5. Scaffolding ---
-echo "Setting up Workspace..."
+# --- 5. Get River 0.4.0 protocol XML ---
+echo "Setting up workspace..."
 mkdir -p protocol src include
 
-if [ ! -f "protocol/river-window-management-v1.xml" ]; then
-    wget -q "https://raw.githubusercontent.com/riverwm/river/${RIVER_TAG}/protocol/river-window-management-v1.xml" \
-         -O protocol/river-window-management-v1.xml
-fi
+echo "Downloading River 0.4.0 window management protocol..."
+wget -q "https://codeberg.org/river/river/raw/tag/${RIVER_TAG}/protocol/river-window-management-v1.xml" \
+    -O protocol/river-window-management-v1.xml
 
-# --- 6. Automated Init Update ---
-echo "Automating River configuration to launch Rinux-WM and Foot..."
+echo "Protocol saved to protocol/river-window-management-v1.xml"
+
+# --- 6. Update River init ---
+echo "Updating River init config..."
 CONFIG_FILE="$HOME/.config/river/init"
 
-# Ensure Rinux-WM is launched
 if ! grep -q "rinux-wm" "$CONFIG_FILE"; then
-    echo "" >> "$CONFIG_FILE"
-    echo "# Launch Rinux-WM automatically" >> "$CONFIG_FILE"
-    echo "$HOME/Rinux/rinux-wm &" >> "$CONFIG_FILE"
-    echo " [+] Config updated: Rinux-WM auto-start added to $CONFIG_FILE"
-else
-    echo " [SKIP] Rinux-WM launch command already present."
-fi
+    cat >> "$CONFIG_FILE" <<'EOF'
 
-# Ensure Foot starts up for visual testing
-if ! grep -q "foot &" "$CONFIG_FILE"; then
-    echo "" >> "$CONFIG_FILE"
-    echo "# Auto-start foot terminal for testing" >> "$CONFIG_FILE"
-    echo "foot &" >> "$CONFIG_FILE"
-    echo " [+] Config updated: Foot terminal auto-start added to $CONFIG_FILE"
+# Rinux WM + Wine Desktop
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+$HOME/Rinux/rinux-wm > /tmp/rinux.log 2>&1 &
+sleep 2
+riverctl default-border-width 0
+riverctl csd-filter-add "wine*"
+riverctl background-color 0x4682b4
+riverctl spawn "env -u DISPLAY WINEWAYLAND=1 wine explorer /desktop=shell,1280x800"
+EOF
+    echo "[+] Config updated: Rinux-WM added to $CONFIG_FILE"
 else
-    echo " [SKIP] Foot auto-start command already present."
+    echo "[SKIP] Rinux-WM already present in config."
 fi
 
 echo "---"
-echo "SUCCESS: River built on stable tag ${RIVER_TAG} and workspace ready."
-echo "Your River configuration has been automated to start your WM and a terminal."
+echo "SUCCESS: River ${RIVER_TAG} built and installed."
+echo "Run 'river -version' to confirm, then restart River."
