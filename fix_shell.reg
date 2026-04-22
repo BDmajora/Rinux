@@ -1,0 +1,14 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Software\Wine\Explorer]
+"Desktop"="shell"
+
+[HKEY_CURRENT_USER\Software\Wine\Explorer\Desktops]
+"shell"="1280x800"
+
+; This forces the taskbar to stay at the bottom and prevents 
+; internal windows from trying to 'center' on a phantom display
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3]
+"Settings"=hex:30,00,00,00,fe,ff,ff,ff,03,00,00,00,03,00,00,00,3e,00,00,00,28,\
+  00,00,00,00,00,00,00,e8,02,00,00,00,05,00,00,20,03,00,00,60,00,00,00,01,00,\
+  00,00
