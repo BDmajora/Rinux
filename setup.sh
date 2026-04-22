@@ -7,7 +7,6 @@ sudo apt update
 sudo apt install -y build-essential gcc g++ libwayland-dev libwayland-bin wayland-protocols pkg-config libwlroots-0.18-dev libxkbcommon-dev libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git scdoc foot wine
 
 # --- 2. Install Zig 0.11.0 ---
-# This version perfectly matches the River v0.4.0 codebase requirements.
 ZIG_VERSION="0.11.0"
 if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
     echo "Installing Zig ${ZIG_VERSION}..."
@@ -25,15 +24,29 @@ if [ ! -d "river" ]; then
     git clone --recursive https://codeberg.org/river/river.git
 fi
 cd river
-# Ensure we have a clean slate for v0.4.0
 git fetch --tags
 git reset --hard v0.4.0
 git submodule update --init --recursive
 
-# --- 4. Build & Install ---
+# --- 4. Surgical Patches ---
+
+# Fix A: Update manifest name from enum literal to string literal
+# This fixes the "expected string literal" error in build.zig.zon
+echo "Patching build.zig.zon..."
+sed -i 's/\.name = \.river,/\.name = "river",/' build.zig.zon
+
+# Fix B: Fetch dependencies to populate cache
+echo "Fetching dependencies..."
+zig build --fetch || true
+
+# Fix C: Unlock and patch cached dependencies
+echo "Unlocking and patching Zig cache..."
+chmod -R u+w ~/.cache/zig/p/ 2>/dev/null || true
+find ~/.cache/zig/p -name "scanner.zig" -exec sed -i 's/\.empty/.{}/g' {} + 2>/dev/null || true
+
+# --- 5. Build & Install ---
 echo "Building River v0.4.0 with Zig 0.11.0..."
 rm -rf .zig-cache zig-out
-# River v0.4.0 on Zig 0.11.0 should build with zero manual patches.
 zig build -Doptimize=ReleaseSafe
 
 echo "Installing binaries..."
@@ -41,7 +54,7 @@ sudo cp zig-out/bin/river /usr/local/bin/
 sudo cp zig-out/bin/riverctl /usr/local/bin/
 cd ..
 
-# --- 5. Protocol and Config ---
+# --- 6. Protocol and Config ---
 mkdir -p protocol
 wget -q "https://codeberg.org/river/river/raw/tag/v0.4.0/protocol/river-window-management-v1.xml" -O protocol/river-window-management-v1.xml
 
