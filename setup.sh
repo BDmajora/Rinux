@@ -27,19 +27,19 @@ git submodule update --init --recursive
 # --- 4. The Surgical Patches ---
 
 # Fix A: Decouple build.zig from build.zig.zon
-# This stops the 'known result type' and 'unexpected field' errors permanently.
 echo "Patching build.zig to hardcode version..."
 sed -i 's/const manifest = @import("build.zig.zon");/\/\/ manifest removed/' build.zig
 sed -i 's/const version = manifest.version;/const version = "0.4.0";/' build.zig
 
 # Fix B: Fetch dependencies so they exist in the cache
-echo "Fetching dependencies (this will likely report a failure, which is fine)..."
+echo "Fetching dependencies..."
 zig build --fetch || true
 
-# Fix C: Patch the 'ArrayList.empty' error in the global cache
-# This finds every scanner.zig in your zig cache and fixes the 0.14.0 breaking change.
-echo "Patching cached dependencies..."
-find ~/.cache/zig/p -name "scanner.zig" -exec sed -i 's/= .empty;/= .{};/g' {} + 2>/dev/null || true
+# Fix C: Unlock and patch the 'ArrayList.empty' error in the global cache
+echo "Patching cached dependencies for Zig 0.14.0 compatibility..."
+# Find files, grant write permission, then replace .empty with .{}
+find ~/.cache/zig/p -name "scanner.zig" -exec chmod u+w {} + 2>/dev/null || true
+find ~/.cache/zig/p -name "scanner.zig" -exec sed -i 's/\.empty/.{}/g' {} + 2>/dev/null || true
 
 # --- 5. Build & Install ---
 echo "Building River with Zig 0.14.0..."
@@ -60,6 +60,7 @@ mkdir -p ~/.config/river
 
 if ! grep -q "rinux-wm" ~/.config/river/init; then
     cat >> ~/.config/river/init <<'EOF'
+
 # Rinux WM Setup
 $HOME/Rinux/rinux-wm > /tmp/rinux.log 2>&1 &
 sleep 2
