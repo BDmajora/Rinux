@@ -29,7 +29,7 @@ riverctl background-color 0x4682b4
 
 # 5. Launch Wine Desktop (Rinux Mode)
 # env -u DISPLAY forces Wine 11 to use the Wayland driver
-riverctl spawn "env -u DISPLAY WINEWAYLAND=1 RENDERER=gdi wine explorer /desktop=Rinux,1280x800"
+riverctl spawn "env -u DISPLAY WINEWAYLAND=1 RENDERER=gdi wine explorer /init /desktop=Rinux,1280x800"
 
 EOF
 
