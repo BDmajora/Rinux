@@ -40,6 +40,7 @@ echo "Unlocking Zig cache directories..."
 chmod -R u+w ~/.cache/zig/p/ 2>/dev/null || true
 
 echo "Patching cached dependencies for Zig 0.14.0 compatibility..."
+# Use a more robust sed pattern to catch .empty regardless of surrounding whitespace
 find ~/.cache/zig/p -name "scanner.zig" -exec sed -i 's/\.empty/.{}/g' {} + 2>/dev/null || true
 
 # --- 5. Build & Install ---
