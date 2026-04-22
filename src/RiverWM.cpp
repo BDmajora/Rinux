@@ -1,7 +1,7 @@
 #include "../include/RiverWM.hpp"
 #include <cstring>
 
-// Output management
+// Output handlers
 static void output_geometry(void* data, wl_output* out, int32_t x, int32_t y, int32_t pw, int32_t ph, int32_t sub, const char* make, const char* model, int32_t trans) {}
 static void output_done(void* data, wl_output* out) {}
 static void output_scale(void* data, wl_output* out, int32_t factor) {}
@@ -26,7 +26,7 @@ static const wl_registry_listener registry_listener = {
     registry_global, registry_global_remove
 };
 
-// River protocol callbacks
+// Protocol callbacks
 static void wm_unavailable(void* data, river_window_manager_v1* wm) {
     static_cast<RiverWM*>(data)->handle_unavailable();
 }
@@ -88,9 +88,9 @@ void RiverWM::set_resolution(int w, int h) {
 void RiverWM::handle_window(river_window_v1* window) {
     views.push_back(new View{window});
     
-    // Log detection of explorer surfaces
+    // Detect Wine surfaces
     if (views.size() == 1) {
-        std::cout << "[Rinux] Wine Desktop Root detected." << std::endl;
+        std::cout << "[Rinux] Root Desktop detected." << std::endl;
     } else {
         std::cout << "[Rinux] Shell component mapped." << std::endl;
     }
