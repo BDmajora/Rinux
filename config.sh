@@ -1,5 +1,5 @@
 #!/bin/sh
-# config.sh - Final "Broken Pipe" Fix for Wine 11
+# config.sh - Rinux-WM Wine 11 Desktop Bootloader
 
 CONFIG_DIR="$HOME/.config/river"
 mkdir -p "$CONFIG_DIR"
@@ -9,22 +9,29 @@ TERM_CMD="foot"
 cat <<EOF > "$CONFIG_DIR/init"
 #!/bin/sh
 
-# 1. Start WM and pipe logs to a file so we can see crashes
+# 1. Start Rinux WM Host
 $RINUX_BIN > /tmp/rinux.log 2>&1 &
 
-# 2. WAIT. Let the EGL/Mesa errors clear and the socket stabilize.
+# 2. Wait for Wayland socket and EGL to stabilize
 sleep 3
 
-# 3. Basic River Config
+# 3. River Keybindings & Rules
 riverctl default-border-width 0
 riverctl map normal Super Return spawn $TERM_CMD
 riverctl map normal Super E exit
 
-# 4. The "Wine 11 Wayland" Autoboot
-# We unset DISPLAY specifically for Wine and use the native driver.
-# Using 'riverctl spawn' ensures the compositor is the one initiating the process.
+# CRITICAL: Prevent River from putting title bars/borders on your Wine Desktop
+riverctl csd-filter-add "wine*"
+riverctl rule-add -app-id "wine*" float
+
+# 4. Set background color (Steel Blue)
+riverctl background-color 0x4682b4
+
+# 5. Launch Wine Desktop (Rinux Mode)
+# env -u DISPLAY forces Wine 11 to use the Wayland driver
 riverctl spawn "env -u DISPLAY WINEWAYLAND=1 RENDERER=gdi wine explorer /desktop=Rinux,1280x800"
 
 EOF
 
 chmod +x "$CONFIG_DIR/init"
+echo "Rinux Desktop Configured. Restart River to boot into Wine."
