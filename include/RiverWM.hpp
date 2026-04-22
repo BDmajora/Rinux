@@ -2,13 +2,21 @@
 #define RIVER_WM_HPP
 
 #include <wayland-client.h>
-
 extern "C" {
 #include "river-window-management-v1-client-protocol.h"
 }
-
 #include <vector>
+#include <string>
 #include <iostream>
+
+// View is a top-level struct (NOT nested inside RiverWM) so that the free
+// C-linkage callback functions in RiverWM.cpp can reference it directly.
+struct View {
+    river_window_v1* handle  = nullptr;
+    river_node_v1*   node    = nullptr;
+    std::string      app_id;
+    std::string      title;
+};
 
 class RiverWM {
 public:
@@ -18,8 +26,9 @@ public:
     bool connect();
     void run();
 
-    void handle_global(wl_registry* registry, uint32_t name, const char* interface, uint32_t version);
-    
+    void handle_global(wl_registry* registry, uint32_t name,
+                       const char* interface, uint32_t version);
+
     // Protocol events
     void handle_window(river_window_v1* window);
     void handle_manage_start();
@@ -27,23 +36,18 @@ public:
     void handle_output(river_output_v1* output);
     void handle_seat(river_seat_v1* seat);
     void handle_unavailable();
-
     void set_resolution(int w, int h);
-    void layout(); 
+    void layout();
 
 private:
-    wl_display* display = nullptr;
-    wl_registry* registry = nullptr;
+    wl_display*              display  = nullptr;
+    wl_registry*             registry = nullptr;
     river_window_manager_v1* river_wm = nullptr;
 
-    int screen_width = 1280; 
+    int screen_width  = 1280;
     int screen_height = 800;
 
-    struct View {
-        river_window_v1* handle;
-        river_node_v1* node;
-    };
-    std::vector<View*> views;
+    std::vector<View*>            views;
     std::vector<river_output_v1*> outputs;
 };
 

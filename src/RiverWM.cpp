@@ -1,87 +1,157 @@
 #include "../include/RiverWM.hpp"
 #include <cstring>
-#include <algorithm>
 #include <iostream>
 #include <cstdlib>
 #include <string>
 
-// --- Window Metadata Listeners ---
-// These listeners allow the WM to identify specific windows like the Wine taskbar.
-static void window_title(void* data, river_window_v1* window, const char* title) {}
+// ---------------------------------------------------------------------------
+// river_window_v1 listener
+//
+// The listener struct has 18 members (from the generated header). Every one
+// must be present — either a real function pointer or nullptr. The order
+// must match the struct definition exactly:
+//   closed, dimensions_hint, dimensions, app_id, title, parent,
+//   decoration_hint, pointer_move_requested, pointer_resize_requested,
+//   show_window_menu_requested, maximize_requested, unmaximize_requested,
+//   fullscreen_requested, exit_fullscreen_requested, minimize_requested,
+//   unreliable_pid, presentation_hint, identifier
+//
+// View is a top-level struct (defined in the header) so these free functions
+// can access it without any forward-declaration issues.
+// ---------------------------------------------------------------------------
 
-static void window_app_id(void* data, river_window_v1* window, const char* id) {
-    if (id) {
-        static_cast<View*>(data)->app_id = id;
-    }
+static void win_closed(void* data, river_window_v1*) {
+    // Optional: mark view as closed so layout() can skip it.
+    // For now we leave it to the manage sequence to handle.
 }
 
+static void win_dimensions_hint(void* data, river_window_v1*,
+    int32_t, int32_t, int32_t, int32_t) {}
+
+static void win_dimensions(void* data, river_window_v1*,
+    int32_t, int32_t) {}
+
+static void win_app_id(void* data, river_window_v1*, const char* id) {
+    if (id)
+        static_cast<View*>(data)->app_id = id;
+}
+
+static void win_title(void* data, river_window_v1*, const char* title) {
+    if (title)
+        static_cast<View*>(data)->title = title;
+}
+
+static void win_parent(void* data, river_window_v1*, river_window_v1*) {}
+static void win_decoration_hint(void* data, river_window_v1*, uint32_t) {}
+static void win_pointer_move_requested(void* data, river_window_v1*, river_seat_v1*) {}
+static void win_pointer_resize_requested(void* data, river_window_v1*, river_seat_v1*, uint32_t) {}
+static void win_show_window_menu_requested(void* data, river_window_v1*, int32_t, int32_t) {}
+static void win_maximize_requested(void* data, river_window_v1*) {}
+static void win_unmaximize_requested(void* data, river_window_v1*) {}
+static void win_fullscreen_requested(void* data, river_window_v1*, river_output_v1*) {}
+static void win_exit_fullscreen_requested(void* data, river_window_v1*) {}
+static void win_minimize_requested(void* data, river_window_v1*) {}
+static void win_unreliable_pid(void* data, river_window_v1*, int32_t) {}
+static void win_presentation_hint(void* data, river_window_v1*, uint32_t) {}
+static void win_identifier(void* data, river_window_v1*, const char*) {}
+
 static const river_window_v1_listener window_listener = {
-    .title = window_title,
-    .app_id = window_app_id,
-    .set_status = nullptr
+    .closed                    = win_closed,
+    .dimensions_hint           = win_dimensions_hint,
+    .dimensions                = win_dimensions,
+    .app_id                    = win_app_id,
+    .title                     = win_title,
+    .parent                    = win_parent,
+    .decoration_hint           = win_decoration_hint,
+    .pointer_move_requested    = win_pointer_move_requested,
+    .pointer_resize_requested  = win_pointer_resize_requested,
+    .show_window_menu_requested = win_show_window_menu_requested,
+    .maximize_requested        = win_maximize_requested,
+    .unmaximize_requested      = win_unmaximize_requested,
+    .fullscreen_requested      = win_fullscreen_requested,
+    .exit_fullscreen_requested = win_exit_fullscreen_requested,
+    .minimize_requested        = win_minimize_requested,
+    .unreliable_pid            = win_unreliable_pid,
+    .presentation_hint         = win_presentation_hint,
+    .identifier                = win_identifier,
 };
 
-// --- Wayland Output Listeners ---
-static void output_geometry(void* data, wl_output* out, int32_t x, int32_t y, int32_t pw, int32_t ph, int32_t sub, const char* make, const char* model, int32_t trans) {}
-static void output_done(void* data, wl_output* out) {}
-static void output_scale(void* data, wl_output* out, int32_t factor) {}
+// ---------------------------------------------------------------------------
+// wl_output listener
+// ---------------------------------------------------------------------------
 
-static void output_mode(void* data, wl_output* out, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
-    if (flags & WL_OUTPUT_MODE_CURRENT) {
+static void output_geometry(void*, wl_output*, int32_t, int32_t, int32_t,
+    int32_t, int32_t, const char*, const char*, int32_t) {}
+static void output_done(void*, wl_output*) {}
+static void output_scale(void*, wl_output*, int32_t) {}
+
+static void output_mode(void* data, wl_output*, uint32_t flags,
+    int32_t width, int32_t height, int32_t)
+{
+    if (flags & WL_OUTPUT_MODE_CURRENT)
         static_cast<RiverWM*>(data)->set_resolution(width, height);
-    }
 }
 
 static const wl_output_listener output_listener = {
     output_geometry, output_mode, output_done, output_scale
 };
 
-// --- Registry Listeners ---
-static void registry_global(void* data, wl_registry* reg, uint32_t name, const char* intf, uint32_t ver) {
+// ---------------------------------------------------------------------------
+// wl_registry listener
+// ---------------------------------------------------------------------------
+
+static void registry_global(void* data, wl_registry* reg,
+    uint32_t name, const char* intf, uint32_t ver)
+{
     static_cast<RiverWM*>(data)->handle_global(reg, name, intf, ver);
 }
-static void registry_global_remove(void* data, wl_registry* reg, uint32_t name) {}
+static void registry_global_remove(void*, wl_registry*, uint32_t) {}
 
 static const wl_registry_listener registry_listener = {
     registry_global, registry_global_remove
 };
 
-// --- Window Manager Callbacks ---
-static void wm_unavailable(void* data, river_window_manager_v1* wm) {
+// ---------------------------------------------------------------------------
+// river_window_manager_v1 listener
+// ---------------------------------------------------------------------------
+
+static void wm_unavailable(void* data, river_window_manager_v1*) {
     static_cast<RiverWM*>(data)->handle_unavailable();
 }
-
-static void wm_manage_start(void* data, river_window_manager_v1* wm) {
+static void wm_finished(void* data, river_window_manager_v1*) {}
+static void wm_manage_start(void* data, river_window_manager_v1*) {
     static_cast<RiverWM*>(data)->handle_manage_start();
 }
-
-static void wm_render_start(void* data, river_window_manager_v1* wm) {
+static void wm_render_start(void* data, river_window_manager_v1*) {
     static_cast<RiverWM*>(data)->handle_render_start();
 }
-
-static void wm_window(void* data, river_window_manager_v1* wm, river_window_v1* window) {
+static void wm_session_locked(void* data, river_window_manager_v1*) {}
+static void wm_session_unlocked(void* data, river_window_manager_v1*) {}
+static void wm_window(void* data, river_window_manager_v1*, river_window_v1* window) {
     static_cast<RiverWM*>(data)->handle_window(window);
 }
-
-static void wm_output(void* data, river_window_manager_v1* wm, river_output_v1* output) {
+static void wm_output(void* data, river_window_manager_v1*, river_output_v1* output) {
     static_cast<RiverWM*>(data)->handle_output(output);
 }
-
-static void wm_seat(void* data, river_window_manager_v1* wm, river_seat_v1* seat) {
+static void wm_seat(void* data, river_window_manager_v1*, river_seat_v1* seat) {
     static_cast<RiverWM*>(data)->handle_seat(seat);
 }
 
 static const river_window_manager_v1_listener wm_listener = {
-    .unavailable = wm_unavailable,
-    .finished    = nullptr,
-    .manage_start = wm_manage_start,
-    .render_start = wm_render_start,
-    .session_locked = nullptr,
-    .session_unlocked = nullptr,
-    .window      = wm_window,
-    .output      = wm_output,
-    .seat        = wm_seat
+    .unavailable     = wm_unavailable,
+    .finished        = wm_finished,
+    .manage_start    = wm_manage_start,
+    .render_start    = wm_render_start,
+    .session_locked  = wm_session_locked,
+    .session_unlocked = wm_session_unlocked,
+    .window          = wm_window,
+    .output          = wm_output,
+    .seat            = wm_seat,
 };
+
+// ---------------------------------------------------------------------------
+// RiverWM implementation
+// ---------------------------------------------------------------------------
 
 RiverWM::RiverWM() {}
 
@@ -93,7 +163,7 @@ RiverWM::~RiverWM() {
     }
     if (river_wm) river_window_manager_v1_destroy(river_wm);
     if (registry) wl_registry_destroy(registry);
-    if (display) wl_display_disconnect(display);
+    if (display)  wl_display_disconnect(display);
 }
 
 bool RiverWM::connect() {
@@ -109,38 +179,42 @@ bool RiverWM::connect() {
     return true;
 }
 
-void RiverWM::handle_global(wl_registry* reg, uint32_t name, const char* intf, uint32_t ver) {
+void RiverWM::handle_global(wl_registry* reg, uint32_t name,
+    const char* intf, uint32_t /*ver*/)
+{
     if (std::strcmp(intf, "river_window_manager_v1") == 0) {
-        river_wm = static_cast<river_window_manager_v1*>(wl_registry_bind(reg, name, &river_window_manager_v1_interface, 1));
+        river_wm = static_cast<river_window_manager_v1*>(
+            wl_registry_bind(reg, name, &river_window_manager_v1_interface, 1));
     } else if (std::strcmp(intf, "wl_output") == 0) {
-        wl_output* output = static_cast<wl_output*>(wl_registry_bind(reg, name, &wl_output_interface, 2));
-        wl_output_add_listener(output, &output_listener, this);
+        wl_output* out = static_cast<wl_output*>(
+            wl_registry_bind(reg, name, &wl_output_interface, 2));
+        wl_output_add_listener(out, &output_listener, this);
     }
 }
 
 void RiverWM::set_resolution(int w, int h) {
-    screen_width = w;
+    screen_width  = w;
     screen_height = h;
     if (river_wm) river_window_manager_v1_manage_dirty(river_wm);
 }
 
 void RiverWM::handle_window(river_window_v1* window) {
-    // Note: Ensure your View struct has 'std::string app_id' and 'std::string title' members.
-    View* v = new View{window, river_window_v1_get_node(window)};
-    
-    // Attach the listener to capture the app_id
+    View* v = new View{};
+    v->handle = window;
+    v->node   = river_window_v1_get_node(window);
+
+    // Attach listener so win_app_id / win_title populate v->app_id / v->title
+    // before the next manage sequence starts.
     river_window_v1_add_listener(window, &window_listener, v);
-    
+
     views.push_back(v);
-    
+
     if (river_wm) river_window_manager_v1_manage_dirty(river_wm);
 }
 
 void RiverWM::handle_output(river_output_v1* output) {
     outputs.push_back(output);
-    if (river_wm) {
-        river_window_manager_v1_manage_dirty(river_wm);
-    }
+    if (river_wm) river_window_manager_v1_manage_dirty(river_wm);
 }
 
 void RiverWM::handle_manage_start() {
@@ -156,24 +230,29 @@ void RiverWM::layout() {
     if (views.empty() || outputs.empty()) return;
 
     for (auto const& v : views) {
-        // --- THE FIX ---
-        // We check the app_id to identify specific windows.
-        // Wine taskbars usually identify as "wine_explorer.exe".
-        if (v->app_id == "wine_explorer.exe" || v->app_id == "panel") {
-            // Map the window but skip the fullscreen logic.
-            // You can also use river_node_v1_set_position here if you want it docked.
+        // Debug: uncomment to see what app_id Wine reports at runtime
+        // std::cerr << "[Rinux] window app_id='" << v->app_id
+        //           << "' title='" << v->title << "'\n";
+
+        // The Wine taskbar / shell window. We let it position itself —
+        // do NOT fullscreen it. Just ensure it is shown and on top.
+        if (v->app_id.find("explorer") != std::string::npos ||
+            v->app_id == "panel")
+        {
+            river_node_v1_place_top(v->node);
             river_window_v1_show(v->handle);
             continue;
         }
 
-        // Standard monocle fullscreen for normal app windows
+        // All other windows get monocle-fullscreened on the first output.
         river_window_v1_fullscreen(v->handle, outputs[0]);
         river_node_v1_set_position(v->node, 0, 0);
         river_window_v1_show(v->handle);
     }
 }
 
-void RiverWM::handle_seat(river_seat_v1* seat) {}
+void RiverWM::handle_seat(river_seat_v1*) {}
+
 void RiverWM::handle_unavailable() { std::exit(0); }
 
 void RiverWM::run() {
