@@ -20,16 +20,22 @@ public:
 
     void handle_global(wl_registry* registry, uint32_t name, const char* interface, uint32_t version);
     
-    // protocol events for river_window_manager_v1
+    // Protocol events
     void handle_window(river_window_v1* window);
     void handle_output(river_output_v1* output);
     void handle_seat(river_seat_v1* seat);
     void handle_unavailable();
 
+    // Resolution update
+    void set_resolution(int w, int h);
+
 private:
     wl_display* display = nullptr;
     wl_registry* registry = nullptr;
     river_window_manager_v1* river_wm = nullptr;
+
+    int screen_width = 1280; // Fallback
+    int screen_height = 800;
 
     struct View {
         river_window_v1* handle;
