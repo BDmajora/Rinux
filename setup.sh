@@ -6,18 +6,16 @@ echo "Installing system dependencies..."
 sudo apt update
 sudo apt install -y build-essential gcc g++ libwayland-dev libwayland-bin wayland-protocols pkg-config libwlroots-0.18-dev libxkbcommon-dev libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git scdoc foot wine
 
-# --- 2. Install Zig 0.11.0 ---
-ZIG_VERSION="0.11.0"
+# --- 2. Install Zig 0.14.0 ---
+ZIG_VERSION="0.14.0"
 if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
     echo "Installing Zig ${ZIG_VERSION}..."
     wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
     tar -xf "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
-    sudo rm -rf /opt/zig 
-    sudo mv "zig-linux-x86_64-${ZIG_VERSION}" /opt/zig
+    sudo rm -rf /opt/zig && sudo mv "zig-linux-x86_64-${ZIG_VERSION}" /opt/zig
     sudo ln -sf /opt/zig/zig /usr/local/bin/zig
     rm "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
 fi
-echo "Current Zig version: $(zig version)"
 
 # --- 3. River Setup (Tagged v0.4.0) ---
 if [ ! -d "river" ]; then
@@ -28,24 +26,26 @@ git fetch --tags
 git reset --hard v0.4.0
 git submodule update --init --recursive
 
-# --- 4. Surgical Patches ---
+# --- 4. The Surgical Patches for Zig 0.14.0 Compatibility ---
 
-# Fix A: Update manifest name from enum literal to string literal
-# This fixes the "expected string literal" error in build.zig.zon
-echo "Patching build.zig.zon..."
-sed -i 's/\.name = \.river,/\.name = "river",/' build.zig.zon
+# Fix A: Decouple versioning from the ZON manifest
+# This fixes the '@import of ZON must have a known result type' error
+echo "Patching build.zig..."
+sed -i 's/const manifest = @import("build.zig.zon");/\/\/ manifest removed/' build.zig
+sed -i 's/const version = manifest.version;/const version = "0.4.0";/' build.zig
 
-# Fix B: Fetch dependencies to populate cache
-echo "Fetching dependencies..."
+# Fix B: Populate the cache so we can patch dependencies
+echo "Fetching dependencies (expect this to log errors, it's fine)..."
 zig build --fetch || true
 
-# Fix C: Unlock and patch cached dependencies
+# Fix C: Unlock and fix the 'ArrayList.empty' error in the global cache
+# This fixes the 'no member named empty' error
 echo "Unlocking and patching Zig cache..."
 chmod -R u+w ~/.cache/zig/p/ 2>/dev/null || true
 find ~/.cache/zig/p -name "scanner.zig" -exec sed -i 's/\.empty/.{}/g' {} + 2>/dev/null || true
 
 # --- 5. Build & Install ---
-echo "Building River v0.4.0 with Zig 0.11.0..."
+echo "Building River v0.4.0 with Zig 0.14.0..."
 rm -rf .zig-cache zig-out
 zig build -Doptimize=ReleaseSafe
 
@@ -54,15 +54,9 @@ sudo cp zig-out/bin/river /usr/local/bin/
 sudo cp zig-out/bin/riverctl /usr/local/bin/
 cd ..
 
-# --- 6. Protocol and Config ---
-mkdir -p protocol
-wget -q "https://codeberg.org/river/river/raw/tag/v0.4.0/protocol/river-window-management-v1.xml" -O protocol/river-window-management-v1.xml
-
+# --- 6. Config ---
 mkdir -p ~/.config/river
-if [ ! -f ~/.config/river/init ]; then
-    cp river/example/init ~/.config/river/init
-    chmod +x ~/.config/river/init
-fi
+[ ! -f ~/.config/river/init ] && cp river/example/init ~/.config/river/init && chmod +x ~/.config/river/init
 
 if ! grep -q "rinux-wm" ~/.config/river/init; then
     cat >> ~/.config/river/init <<'EOF'
@@ -76,4 +70,4 @@ riverctl spawn "env -u DISPLAY WINEWAYLAND=1 wine explorer /desktop=shell,1280x8
 EOF
 fi
 
-echo "Success. River v0.4.0 is now installed via Zig 0.11.0."
+echo "River v0.4.0 successfully forced onto Zig 0.14.0."
