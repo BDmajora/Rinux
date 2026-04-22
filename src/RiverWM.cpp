@@ -1,7 +1,7 @@
 #include "../include/RiverWM.hpp"
 #include <cstring>
 
-// --- Wayland Output Listeners (Resolution detection) ---
+// --- Wayland Output Listeners ---
 static void output_geometry(void* data, wl_output* out, int32_t x, int32_t y, int32_t pw, int32_t ph, int32_t sub, const char* make, const char* model, int32_t trans) {}
 static void output_done(void* data, wl_output* out) {}
 static void output_scale(void* data, wl_output* out, int32_t factor) {}
@@ -83,14 +83,20 @@ void RiverWM::handle_global(wl_registry* reg, uint32_t name, const char* intf, u
 void RiverWM::set_resolution(int w, int h) {
     screen_width = w;
     screen_height = h;
-    std::cout << "Resolution locked: " << w << "x" << h << std::endl;
 }
 
 void RiverWM::handle_window(river_window_v1* window) {
-    std::cout << "Wine/App Window mapped. Scaling to screen." << std::endl;
     views.push_back(new View{window});
-    // Dynamically size to the screen resolution detected earlier
-    river_window_v1_set_dimension_bounds(window, screen_width, screen_height);
+
+    // CRITICAL FIX: We use the guaranteed-to-compile dimension bounds, 
+    // but only force it on the very first window (the desktop background).
+    if (views.size() == 1) {
+        std::cout << "[Rinux] Locking Primary Desktop to " << screen_width << "x" << screen_height << std::endl;
+        river_window_v1_set_dimension_bounds(window, screen_width, screen_height);
+    } else {
+        // Taskbar/Start Menu fall in here. They map naturally.
+        std::cout << "[Rinux] Shell component detected and allowed to overlay." << std::endl;
+    }
 }
 
 void RiverWM::handle_output(river_output_v1* output) {}
@@ -98,6 +104,6 @@ void RiverWM::handle_seat(river_seat_v1* seat) {}
 void RiverWM::handle_unavailable() { exit(0); }
 
 void RiverWM::run() {
-    std::cout << "Rinux (Wine-DE Host) active..." << std::endl;
+    std::cout << "Rinux active..." << std::endl;
     while (wl_display_dispatch(display) != -1) {}
 }
