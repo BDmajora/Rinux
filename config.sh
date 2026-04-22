@@ -1,42 +1,44 @@
 #!/bin/bash
-# config.sh - Configures River to host the Wine Desktop (Pure Wayland)
+# config.sh - Final Wayland-First Configuration
 
 CONFIG_DIR="$HOME/.config/river"
 mkdir -p "$CONFIG_DIR"
-
-# Path to your compiled WM
 RINUX_BIN="$HOME/Rinux/rinux-wm"
 
-# 1. Force Wine to use the native Wayland driver (Registry Tweak)
-echo "Enabling Wine Wayland driver..."
-wine reg add "HKCU\Software\Wine\Drivers" /v Graphics /t REG_SZ /d "wayland" /f
+echo "Configuring Wine for Native Wayland (Wine 10+ style)..."
+
+# 1. Initialize the prefix (quietly)
+wineboot -i 
+
+# 2. Set Registry to prioritize Wayland over X11
+# This tells Wine: "Try Wayland first, fall back to x11 if you must"
+wine reg add "HKCU\Software\Wine\Drivers" /v Graphics /t REG_SZ /d "wayland,x11" /f
 
 echo "Generating River init file..."
 
 cat <<EOF > "$CONFIG_DIR/init"
 #!/bin/sh
 
-# 1. Start your custom Window Manager in the background
+# 1. Start Rinux-WM
 $RINUX_BIN &
 
-# 2. Keybindings (Minimalist)
+# 2. Window Rules
+riverctl rule-add -app-id "wine*" float
+riverctl csd-filter-add "wine*"
+
+# 3. Keybindings
 riverctl map normal Super Q close
 riverctl map normal Super Return spawn foot
 riverctl map normal Super E exit
 
-# 3. Window Rules for Wine
-# Ensure Wine doesn't get tiled or decorated with Linux title bars
-riverctl rule-add -app-id "wine*" float
-riverctl csd-filter-add "wine*"
-
 # 4. Launch Wine Desktop
-# Adding 'explorer.exe' at the end specifically tells Wine to start the taskbar shell
-wine explorer /desktop=Rinux,1280x800 explorer.exe &
+# We unset DISPLAY by setting it to an empty string. 
+# This forces Wine 10 to use the Wayland driver.
+env DISPLAY= wine explorer /desktop=Rinux,1280x800 explorer.exe &
 
-# 5. Set background color (Steel Blue)
 riverctl background-color 0x4682b4
 EOF
 
 chmod +x "$CONFIG_DIR/init"
 echo "---"
-echo "Config complete. Run 'river' to start your Pure Wayland Wine DE."
+echo "Config complete. Run 'river' to start your Native Wayland DE."
