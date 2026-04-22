@@ -9,13 +9,27 @@ extern "C" {
 #include <string>
 #include <iostream>
 
-// View is a top-level struct (NOT nested inside RiverWM) so that the free
-// C-linkage callback functions in RiverWM.cpp can reference it directly.
+// ---------------------------------------------------------------------------
+// Top-level structs — must be outside RiverWM so free C callback functions
+// in RiverWM.cpp can reference them directly.
+// ---------------------------------------------------------------------------
+
 struct View {
     river_window_v1* handle  = nullptr;
     river_node_v1*   node    = nullptr;
     std::string      app_id;
     std::string      title;
+};
+
+// Tracks the logical dimensions/position of a river_output_v1.
+// These come from the river_output_v1.dimensions and .position events and
+// are more reliable than wl_output mode for multi-monitor or scaled setups.
+struct OutputInfo {
+    river_output_v1* handle = nullptr;
+    int32_t x      = 0;
+    int32_t y      = 0;
+    int32_t width  = 0;   // 0 until the compositor sends dimensions
+    int32_t height = 0;
 };
 
 class RiverWM {
@@ -36,7 +50,10 @@ public:
     void handle_output(river_output_v1* output);
     void handle_seat(river_seat_v1* seat);
     void handle_unavailable();
+
+    // Fallback: called by the wl_output mode listener
     void set_resolution(int w, int h);
+
     void layout();
 
 private:
@@ -44,11 +61,12 @@ private:
     wl_registry*             registry = nullptr;
     river_window_manager_v1* river_wm = nullptr;
 
+    // Fallback resolution from wl_output (used if OutputInfo dimensions = 0)
     int screen_width  = 1280;
     int screen_height = 800;
 
-    std::vector<View*>            views;
-    std::vector<river_output_v1*> outputs;
+    std::vector<View*>        views;
+    std::vector<OutputInfo*>  output_infos;
 };
 
 #endif
