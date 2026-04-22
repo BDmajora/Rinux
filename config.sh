@@ -1,43 +1,40 @@
 #!/bin/sh
-# config.sh - Updated for Wine Autoboot
+# config.sh - Rinux DE (Native Wayland Wine)
 
 CONFIG_DIR="$HOME/.config/river"
 mkdir -p "$CONFIG_DIR"
 RINUX_BIN="$HOME/Rinux/rinux-wm"
 TERM_CMD="foot"
 
-# Define the Wine Desktop resolution to match your C++ code
+# Target Resolution
 RES_W=1280
 RES_H=800
 
 cat <<EOF > "$CONFIG_DIR/init"
 #!/bin/sh
 
-# 1. Launch the C++ Window Manager Host
+# 1. Force Wine to use the Native Wayland Driver
+# This adds the registry key required for Wine 9.0+ Wayland support
+wine reg add "HKEY_CURRENT_USER\Software\Wine\Drivers" /v "Graphics" /t REG_SZ /d "wayland" /f
+
+# 2. Start C++ WM Host
 $RINUX_BIN &
 
-# 2. Wait a split second for the WM to register with the compositor
-sleep 0.5
-
-# 3. Autoboot Wine Virtual Desktop
-# This creates a "monocle" style Wine environment
-wine explorer /desktop=Rinux,${RES_W}x${RES_H} &
-
-# 4. Native River Rules & Styles
-riverctl default-border-width 2
-riverctl border-color-focused 0x93a1a1
-riverctl border-color-unfocused 0x586e75
-
-# 5. Keybindings
+# 3. Keybindings
 riverctl map normal Super Q close
 riverctl map normal Super E exit
-riverctl map normal Super Return spawn $TERM_CMD
+riverctl map normal Super Return spawn "$TERM_CMD"
 
-# Default background
-riverctl background-color 0x002b36
+# 4. Global Style
+riverctl default-border-width 0
+riverctl background-color 0x000000
+
+# 5. Autoboot Wine Desktop (Native Wayland Mode)
+# We explicitly unset DISPLAY to prevent Xwayland fallback
+riverctl spawn "env DISPLAY= wine explorer /desktop=Rinux,${RES_W}x${RES_H}"
+
 EOF
 
 chmod +x "$CONFIG_DIR/init"
-echo "River configuration reset."
-echo "Autoboot set: Wine Virtual Desktop ($RES_W x $RES_H)"
-echo "Emergency Terminal: Super+Return | Exit: Super+E"
+echo "Rinux config updated: Wine Native Wayland enabled."
+echo "Resolution set to ${RES_W}x${RES_H}."
