@@ -54,6 +54,11 @@ git fetch --tags
 git checkout "$RIVER_TAG"
 git submodule update --init --recursive
 
+# PATCH: Fix Zig 0.14.0 'known result type' error for ZON import
+# This satisfies the new compiler requirement for explicit struct types on ZON imports.
+echo "Patching build.zig for Zig 0.14.0 compatibility..."
+sed -i 's/const manifest = @import("build.zig.zon");/const manifest: struct { version: []const u8 } = @import("build.zig.zon");/' build.zig
+
 # Clear previous build artifacts
 rm -rf .zig-cache zig-out
 
