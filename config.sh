@@ -20,11 +20,18 @@ riverctl map normal Super Q close
 riverctl map normal Super Return spawn foot
 riverctl map normal Super E exit
 
-# 3. Launch Wine Desktop
-# We let Rinux-WM handle the sizing, so we just launch it bare
-wine explorer /desktop=Rinux &
+# 3. Window Rules for Wine (CRITICAL FOR BAREBONES DE)
+# Force all Wine windows to float so they aren't forced into tiling layouts
+riverctl rule-add -app-id "wine*" float
 
-# 4. Set background color (Steel Blue)
+# Tell River NOT to draw server-side decorations (title bars) on Wine
+riverctl csd-filter-add "wine*"
+
+# 4. Launch Wine Desktop
+# Launching with explicit resolution helps Wine's internal renderer map the taskbar correctly
+wine explorer /desktop=Rinux,1280x800 &
+
+# 5. Set background color (Steel Blue)
 riverctl background-color 0x4682b4
 EOF
 
