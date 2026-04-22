@@ -1,113 +1,72 @@
 #!/bin/bash
 set -e
 
-# --- 1. Cleanup & Dependencies ---
-echo "Cleaning up and installing dependencies..."
-sudo apt remove --purge -y zig || true
+# --- 1. Dependencies ---
+echo "Installing dependencies..."
 sudo apt update
-sudo apt install -y \
-    build-essential \
-    gcc \
-    g++ \
-    libwayland-dev \
-    libwayland-bin \
-    wayland-protocols \
-    pkg-config \
-    libwlroots-0.18-dev \
-    libxkbcommon-dev \
-    libpixman-1-dev \
-    libinput-dev \
-    libudev-dev \
-    libgbm-dev \
-    wget \
-    git \
-    scdoc \
-    foot \
-    wine
+sudo apt install -y build-essential gcc g++ libwayland-dev libwayland-bin wayland-protocols pkg-config libwlroots-0.18-dev libxkbcommon-dev libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git scdoc foot wine
 
-# --- 2. Install Zig 0.13.0 ---
-# This version is required to build River 0.4.0 and its dependencies
-# without running into 0.14.0 standard library breaking changes.
-ZIG_VERSION="0.13.0"
+# --- 2. Force Zig 0.14.0 ---
+ZIG_VERSION="0.14.0"
 if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
     echo "Installing Zig ${ZIG_VERSION}..."
     wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
     tar -xf "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
-    sudo rm -rf /opt/zig
-    sudo mv "zig-linux-x86_64-${ZIG_VERSION}" /opt/zig
+    sudo rm -rf /opt/zig && sudo mv "zig-linux-x86_64-${ZIG_VERSION}" /opt/zig
     sudo ln -sf /opt/zig/zig /usr/local/bin/zig
-    rm "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
-else
-    echo "Zig ${ZIG_VERSION} already installed."
 fi
 
-echo "Zig version: $(zig version)"
-
-# --- 3. Clone & Build River 0.4.0 ---
+# --- 3. River Setup ---
 RIVER_TAG="v0.4.0"
-if [ ! -d "river" ]; then
-    echo "Cloning River..."
-    git clone --recursive https://codeberg.org/river/river.git
-fi
-
+[ ! -d "river" ] && git clone --recursive https://codeberg.org/river/river.git
 cd river
-echo "Checking out River ${RIVER_TAG}..."
 git fetch --tags
 git checkout "$RIVER_TAG"
 git submodule update --init --recursive
 
-# On 0.13.0, the build scripts and ZON imports work natively. 
-# We do not need the sed patches anymore.
-rm -rf .zig-cache zig-out
+# --- 4. The Surgical Patches ---
 
-echo "Building River ${RIVER_TAG}..."
+# Fix A: Decouple build.zig from build.zig.zon
+# This stops the 'known result type' and 'unexpected field' errors permanently.
+echo "Patching build.zig to hardcode version..."
+sed -i 's/const manifest = @import("build.zig.zon");/\/\/ manifest removed/' build.zig
+sed -i 's/const version = manifest.version;/const version = "0.4.0";/' build.zig
+
+# Fix B: Fetch dependencies so they exist in the cache
+echo "Fetching dependencies (this will likely report a failure, which is fine)..."
+zig build --fetch || true
+
+# Fix C: Patch the 'ArrayList.empty' error in the global cache
+# This finds every scanner.zig in your zig cache and fixes the 0.14.0 breaking change.
+echo "Patching cached dependencies..."
+find ~/.cache/zig/p -name "scanner.zig" -exec sed -i 's/= .empty;/= .{};/g' {} + 2>/dev/null || true
+
+# --- 5. Build & Install ---
+echo "Building River with Zig 0.14.0..."
+rm -rf .zig-cache zig-out
 zig build -Doptimize=ReleaseSafe
 
-echo "Installing River binaries..."
+echo "Installing binaries..."
 sudo cp zig-out/bin/river /usr/local/bin/
 sudo cp zig-out/bin/riverctl /usr/local/bin/
 cd ..
 
-# Verify
-echo "River version: $(river -version)"
+# --- 6. Protocols & Config ---
+mkdir -p protocol
+wget -q "https://codeberg.org/river/river/raw/tag/${RIVER_TAG}/protocol/river-window-management-v1.xml" -O protocol/river-window-management-v1.xml
 
-# --- 4. Configuration ---
-echo "Setting up River configuration..."
 mkdir -p ~/.config/river
-if [ ! -f ~/.config/river/init ]; then
-    cp river/example/init ~/.config/river/init
-    chmod +x ~/.config/river/init
-fi
+[ ! -f ~/.config/river/init ] && cp river/example/init ~/.config/river/init && chmod +x ~/.config/river/init
 
-# --- 5. Get River 0.4.0 protocol XML ---
-echo "Setting up workspace..."
-mkdir -p protocol src include
-
-echo "Downloading River 0.4.0 window management protocol..."
-wget -q "https://codeberg.org/river/river/raw/tag/${RIVER_TAG}/protocol/river-window-management-v1.xml" \
-    -O protocol/river-window-management-v1.xml
-
-# --- 6. Update River init ---
-echo "Updating River init config..."
-CONFIG_FILE="$HOME/.config/river/init"
-
-if ! grep -q "rinux-wm" "$CONFIG_FILE"; then
-    cat >> "$CONFIG_FILE" <<'EOF'
-
-# Rinux WM + Wine Desktop
-export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+if ! grep -q "rinux-wm" ~/.config/river/init; then
+    cat >> ~/.config/river/init <<'EOF'
+# Rinux WM Setup
 $HOME/Rinux/rinux-wm > /tmp/rinux.log 2>&1 &
 sleep 2
-riverctl default-border-width 0
 riverctl csd-filter-add "wine*"
-riverctl rule-add -app-id "wine*" float
 riverctl background-color 0x4682b4
 riverctl spawn "env -u DISPLAY WINEWAYLAND=1 wine explorer /desktop=shell,1280x800"
 EOF
-    echo "[+] Config updated: Rinux-WM added to $CONFIG_FILE"
 fi
 
-echo "---"
-echo "SUCCESS: River ${RIVER_TAG} built and installed using Zig 0.13.0."
-echo "Now run: cd ~/Rinux && ./build.sh"
+echo "River 0.4.0 successfully forced onto Zig 0.14.0."
