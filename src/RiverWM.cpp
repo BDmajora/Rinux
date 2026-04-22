@@ -1,7 +1,7 @@
 #include "../include/RiverWM.hpp"
 #include <cstring>
 
-// Output handlers
+// --- Wayland Output Listeners ---
 static void output_geometry(void* data, wl_output* out, int32_t x, int32_t y, int32_t pw, int32_t ph, int32_t sub, const char* make, const char* model, int32_t trans) {}
 static void output_done(void* data, wl_output* out) {}
 static void output_scale(void* data, wl_output* out, int32_t factor) {}
@@ -16,7 +16,7 @@ static const wl_output_listener output_listener = {
     output_geometry, output_mode, output_done, output_scale
 };
 
-// Registry listeners
+// --- Registry Listeners ---
 static void registry_global(void* data, wl_registry* reg, uint32_t name, const char* intf, uint32_t ver) {
     static_cast<RiverWM*>(data)->handle_global(reg, name, intf, ver);
 }
@@ -26,7 +26,7 @@ static const wl_registry_listener registry_listener = {
     registry_global, registry_global_remove
 };
 
-// Protocol callbacks
+// --- Window Manager Callbacks ---
 static void wm_unavailable(void* data, river_window_manager_v1* wm) {
     static_cast<RiverWM*>(data)->handle_unavailable();
 }
@@ -87,11 +87,14 @@ void RiverWM::set_resolution(int w, int h) {
 
 void RiverWM::handle_window(river_window_v1* window) {
     views.push_back(new View{window});
-    
-    // Detect Wine surfaces
+
+    // Handle the Desktop layer
     if (views.size() == 1) {
-        std::cout << "[Rinux] Root Desktop detected." << std::endl;
+        std::cout << "[Rinux] Primary Desktop detected. Triggering Fullscreen Layer." << std::endl;
+        // Instead of just setting dimensions, we use the protocol's fullscreen state
+        river_window_v1_set_fullscreen(window, nullptr);
     } else {
+        // Taskbar/Start Menu - Let them manage their own sizing/placement
         std::cout << "[Rinux] Shell component mapped." << std::endl;
     }
 }
@@ -101,6 +104,6 @@ void RiverWM::handle_seat(river_seat_v1* seat) {}
 void RiverWM::handle_unavailable() { exit(0); }
 
 void RiverWM::run() {
-    std::cout << "Rinux active..." << std::endl;
+    std::cout << "Rinux Host active..." << std::endl;
     while (wl_display_dispatch(display) != -1) {}
 }
