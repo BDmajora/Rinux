@@ -114,8 +114,14 @@ void RiverWM::handle_window(river_window_v1* window) {
     if (river_wm) river_window_manager_v1_manage_dirty(river_wm);
 }
 
+// --- THE FIX IS HERE ---
 void RiverWM::handle_output(river_output_v1* output) {
     outputs.push_back(output);
+    // If windows were already waiting before the output was ready, 
+    // trigger a management cycle now.
+    if (river_wm) {
+        river_window_manager_v1_manage_dirty(river_wm);
+    }
 }
 
 void RiverWM::handle_manage_start() {
@@ -128,17 +134,18 @@ void RiverWM::handle_render_start() {
 }
 
 void RiverWM::layout() {
+    // If we have windows but no output yet, we exit and wait 
+    // for handle_output to trigger us again.
     if (views.empty() || outputs.empty()) return;
 
     for (auto const& v : views) {
-        // 1. Assign to output and set size in one call.
-        // This is the most reliable "Monocle" method in this protocol version.
+        // Assign to the first available output (monocle style)
         river_window_v1_fullscreen(v->handle, outputs[0]);
         
-        // 2. Set node position (0,0 relative to the output)
+        // Set node position (0,0 relative to the output)
         river_node_v1_set_position(v->node, 0, 0);
 
-        // 3. Make visible
+        // Ensure the window is actually mapped
         river_window_v1_show(v->handle);
     }
 }
