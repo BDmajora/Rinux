@@ -1,27 +1,42 @@
 #!/bin/bash
+set -e
 
-# Generate protocol files
-echo "Generating Wayland protocols..."
-wayland-scanner client-header protocol/river-window-management-v1.xml src/river-window-management-v1-client-protocol.h
+# 1. Setup paths
+PROTO_DIR="protocol"
+SRC_DIR="src"
+mkdir -p $PROTO_DIR $SRC_DIR
 
-# Use private-code instead of public-code to avoid visibility warnings
-wayland-scanner private-code protocol/river-window-management-v1.xml src/river-window-management-v1-client-protocol.c
+# 2. Path to your river clone
+RIVER_REPO_PATH="../river"
 
-# Compile the C protocol file separately using gcc to preserve C linkage
-echo "Compiling Wayland protocol (C)..."
-gcc -c -fPIC src/river-window-management-v1-client-protocol.c -o src/river-window-management-v1-client-protocol.o
+echo "Copying ONLY confirmed protocol files..."
+# These two are the heavy hitters for a WM
+cp "$RIVER_REPO_PATH/protocol/river-window-management-v1.xml" $PROTO_DIR/
+cp "$RIVER_REPO_PATH/protocol/river-input-management-v1.xml" $PROTO_DIR/
 
-# Compile the C++ files and link the compiled C object
-echo "Compiling Rinux (C++)..."
+# 3. Generate Headers for confirmed files
+echo "Running wayland-scanner..."
+wayland-scanner client-header $PROTO_DIR/river-window-management-v1.xml $SRC_DIR/river-window-management-v1-client-protocol.h
+wayland-scanner private-code $PROTO_DIR/river-window-management-v1.xml $SRC_DIR/river-window-management-v1-client-protocol.c
+
+wayland-scanner client-header $PROTO_DIR/river-input-management-v1.xml $SRC_DIR/river-input-management-v1-client-protocol.h
+wayland-scanner private-code $PROTO_DIR/river-input-management-v1.xml $SRC_DIR/river-input-management-v1-client-protocol.c
+
+# 4. Compile Protocol Objects
+echo "Compiling C objects..."
+gcc -c -fPIC $SRC_DIR/river-window-management-v1-client-protocol.c -o $SRC_DIR/river-window-management-v1.o
+gcc -c -fPIC $SRC_DIR/river-input-management-v1-client-protocol.c -o $SRC_DIR/river-input-management-v1.o
+
+# 5. Build Rinux-WM
+echo "Compiling Rinux-WM..."
+# We only link the objects we actually generated
 g++ -std=c++17 -Wall -fPIC -I./include -I./src \
     src/main.cpp \
     src/RiverWM.cpp \
-    src/river-window-management-v1-client-protocol.o \
+    $SRC_DIR/river-window-management-v1.o \
+    $SRC_DIR/river-input-management-v1.o \
     -o rinux-wm \
     -lwayland-client
 
-if [ $? -eq 0 ]; then
-    echo "Success: ./rinux-wm"
-else
-    echo "Build failed."
-fi
+echo "-----------------------------------------------"
+echo "Build complete using confirmed 0.4.x protocols."
