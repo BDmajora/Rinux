@@ -9,26 +9,22 @@ extern "C" {
 #include <string>
 #include <iostream>
 
-// ---------------------------------------------------------------------------
-// Top-level structs — must be outside RiverWM so free C callback functions
-// in RiverWM.cpp can reference them directly.
-// ---------------------------------------------------------------------------
-
 struct View {
     river_window_v1* handle  = nullptr;
     river_node_v1*   node    = nullptr;
     std::string      app_id;
     std::string      title;
+    // Actual dimensions reported by the compositor via the dimensions event.
+    // 0 means not yet received.
+    int32_t width  = 0;
+    int32_t height = 0;
 };
 
-// Tracks the logical dimensions/position of a river_output_v1.
-// These come from the river_output_v1.dimensions and .position events and
-// are more reliable than wl_output mode for multi-monitor or scaled setups.
 struct OutputInfo {
     river_output_v1* handle = nullptr;
     int32_t x      = 0;
     int32_t y      = 0;
-    int32_t width  = 0;   // 0 until the compositor sends dimensions
+    int32_t width  = 0;
     int32_t height = 0;
 };
 
@@ -43,17 +39,13 @@ public:
     void handle_global(wl_registry* registry, uint32_t name,
                        const char* interface, uint32_t version);
 
-    // Protocol events
     void handle_window(river_window_v1* window);
     void handle_manage_start();
     void handle_render_start();
     void handle_output(river_output_v1* output);
     void handle_seat(river_seat_v1* seat);
     void handle_unavailable();
-
-    // Fallback: called by the wl_output mode listener
     void set_resolution(int w, int h);
-
     void layout();
 
 private:
@@ -61,12 +53,11 @@ private:
     wl_registry*             registry = nullptr;
     river_window_manager_v1* river_wm = nullptr;
 
-    // Fallback resolution from wl_output (used if OutputInfo dimensions = 0)
     int screen_width  = 1280;
     int screen_height = 800;
 
-    std::vector<View*>        views;
-    std::vector<OutputInfo*>  output_infos;
+    std::vector<View*>       views;
+    std::vector<OutputInfo*> output_infos;
 };
 
 #endif
