@@ -25,8 +25,8 @@ sudo apt install -y \
     foot \
     wine
 
-# --- 2. Install Zig 0.13.0 (required by River 0.4.0) ---
-ZIG_VERSION="0.13.0"
+# --- 2. Install Zig 0.14.0 (required by River 0.4.0) ---
+ZIG_VERSION="0.14.0"
 if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
     echo "Installing Zig ${ZIG_VERSION}..."
     wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
@@ -35,6 +35,8 @@ if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]];
     sudo mv "zig-linux-x86_64-${ZIG_VERSION}" /opt/zig
     sudo ln -sf /opt/zig/zig /usr/local/bin/zig
     rm "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
+else
+    echo "Zig ${ZIG_VERSION} already installed."
 fi
 
 echo "Zig version: $(zig version)"
@@ -108,4 +110,5 @@ fi
 
 echo "---"
 echo "SUCCESS: River ${RIVER_TAG} built and installed."
-echo "Run 'river -version' to confirm, then restart River."
+echo "Now run: cd ~/Rinux && ./build.sh"
+echo "Then restart River to test."
