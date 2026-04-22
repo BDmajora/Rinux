@@ -2,14 +2,12 @@
 set -e
 
 # --- 1. Dependencies ---
-# foot removed. libwlroots-dev replaces versioned package.
+echo "Installing system dependencies..."
 sudo apt update
-sudo apt install -y build-essential gcc g++ libwayland-dev libwayland-bin \
-    wayland-protocols pkg-config libwlroots-dev libxkbcommon-dev \
-    libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git scdoc wine
+sudo apt install -y build-essential gcc g++ libwayland-dev libwayland-bin wayland-protocols pkg-config libwlroots-0.18-dev libxkbcommon-dev libpixman-1-dev libinput-dev libudev-dev libgbm-dev wget git scdoc foot wine
 
 # --- 2. Install Zig 0.13.0 ---
-# Matches River v0.4.0 requirements. 
+# River v0.4.0 officially targets Zig 0.13.0. Using 0.14.0 breaks std.ArrayList.
 ZIG_VERSION="0.13.0"
 if ! command -v zig &> /dev/null || [[ "$(zig version)" != "${ZIG_VERSION}"* ]]; then
     echo "Installing Zig ${ZIG_VERSION}..."
@@ -26,12 +24,12 @@ if [ ! -d "river" ]; then
 fi
 cd river
 git fetch --tags
+# Resetting to 0.4.0 ensures compatibility with wlroots-0.18 and Zig 0.13.0
 git reset --hard v0.4.0
 git submodule update --init --recursive
 
 # --- 4. Build & Install ---
-# v0.4.0 build using Zig 0.13.0.
-# No patches required for this version combination.
+echo "Building River v0.4.0 with Zig 0.13.0..."
 rm -rf .zig-cache zig-out
 zig build -Doptimize=ReleaseSafe
 
