@@ -13,8 +13,9 @@ RES_H=800
 cat <<EOF > "$CONFIG_DIR/init"
 #!/bin/sh
 
-# 1. Force Wine to use Native Wayland Driver (Backgrounded to prevent blocking)
-wine reg add "HKEY_CURRENT_USER\Software\Wine\Drivers" /v "Graphics" /t REG_SZ /d "wayland" /f &
+# 1. Force Wine to use the Native Wayland Driver
+# This adds the registry key required for Wine 9.0+ Wayland support
+wine reg add "HKEY_CURRENT_USER\Software\Wine\Drivers" /v "Graphics" /t REG_SZ /d "wayland" /f
 
 # 2. Start C++ WM Host
 $RINUX_BIN &
@@ -29,9 +30,11 @@ riverctl default-border-width 0
 riverctl background-color 0x000000
 
 # 5. Autoboot Wine Desktop (Native Wayland Mode)
+# We explicitly unset DISPLAY to prevent Xwayland fallback
 riverctl spawn "env DISPLAY= wine explorer /desktop=Rinux,${RES_W}x${RES_H}"
 
 EOF
 
 chmod +x "$CONFIG_DIR/init"
 echo "Rinux config updated: Wine Native Wayland enabled."
+echo "Resolution set to ${RES_W}x${RES_H}."
