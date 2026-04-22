@@ -104,43 +104,49 @@ void RiverWM::handle_global(wl_registry* reg, uint32_t name, const char* intf, u
 void RiverWM::set_resolution(int w, int h) {
     screen_width = w;
     screen_height = h;
-    // Tell compositor we need to re-layout
     if (river_wm) river_window_manager_v1_manage_dirty(river_wm);
 }
 
 void RiverWM::handle_window(river_window_v1* window) {
     View* v = new View{window, river_window_v1_get_node(window)};
     views.push_back(v);
+    
+    if (river_wm) river_window_manager_v1_manage_dirty(river_wm);
+}
+
+void RiverWM::handle_output(river_output_v1* output) {
+    outputs.push_back(output);
 }
 
 void RiverWM::handle_manage_start() {
-    // Stage 1: Layout logical window dimensions
     layout();
     river_window_manager_v1_manage_finish(river_wm);
 }
 
 void RiverWM::handle_render_start() {
-    // Stage 2: Finish rendering sequence to apply position
     river_window_manager_v1_render_finish(river_wm);
 }
 
 void RiverWM::layout() {
-    if (views.empty()) return;
+    if (views.empty() || outputs.empty()) return;
 
     for (auto const& v : views) {
-        // Correct function name: propose_dimensions
-        river_window_v1_propose_dimensions(v->handle, screen_width, screen_height);
+        // 1. Assign to output and set size in one call.
+        // This is the most reliable "Monocle" method in this protocol version.
+        river_window_v1_fullscreen(v->handle, outputs[0]);
         
-        // Correct function name: set_position
+        // 2. Set node position (0,0 relative to the output)
         river_node_v1_set_position(v->node, 0, 0);
+
+        // 3. Make visible
+        river_window_v1_show(v->handle);
     }
 }
 
-void RiverWM::handle_output(river_output_v1* output) {}
 void RiverWM::handle_seat(river_seat_v1* seat) {}
 void RiverWM::handle_unavailable() { std::exit(0); }
 
 void RiverWM::run() {
-    std::cout << "Rinux active in Monocle Mode..." << std::endl;
+    std::cout << "[Rinux] Active in Monocle Mode..." << std::endl;
     while (wl_display_dispatch(display) != -1) {}
 }

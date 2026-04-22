@@ -22,8 +22,8 @@ public:
     
     // Protocol events
     void handle_window(river_window_v1* window);
-    void handle_manage_start(); // NEW: Required for state commits
-    void handle_render_start(); // NEW: Required for rendering commits
+    void handle_manage_start();
+    void handle_render_start();
     void handle_output(river_output_v1* output);
     void handle_seat(river_seat_v1* seat);
     void handle_unavailable();
@@ -44,6 +44,7 @@ private:
         river_node_v1* node;
     };
     std::vector<View*> views;
+    std::vector<river_output_v1*> outputs;
 };
 
 #endif
